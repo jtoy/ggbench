@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, Trophy, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function LeaderboardPage() {
