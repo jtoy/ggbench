@@ -98,7 +98,7 @@ export default function Navigation() {
               </div>
             ) : (
               <>
-                <Link href="/login" className="hidden sm:flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors">
+                <Link href="/signup" className="hidden sm:flex items-center space-x-1 text-gray-600 hover:text-gray-900 transition-colors">
                   <User className="w-4 h-4" />
                   <span className="text-sm font-medium">Sign Up</span>
                 </Link>

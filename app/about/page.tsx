@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Users, Target, Award, BarChart3 } from 'lucide-react'
 
 export default function AboutPage() {
@@ -131,12 +132,12 @@ export default function AboutPage() {
           Your votes contribute to better understanding of AI model performance.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="btn-primary">
+          <Link href="/voting" className="btn-primary">
             Start Voting
-          </button>
-          <button className="btn-secondary">
+          </Link>
+          <Link href="/leaderboard" className="btn-secondary">
             View Leaderboard
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,52 +1,61 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogIn, Eye, EyeOff } from 'lucide-react'
+import { UserPlus, Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
 
-export default function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+export default function SignupPage() {
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    confirmPassword: ''
+  })
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
-
-  // Check for success message in URL
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const message = urlParams.get('message')
-    if (message) {
-      setSuccessMessage(message)
-    }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
+    // Validate passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate password length
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long')
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password
+        })
       })
 
       if (response.ok) {
         const data = await response.json()
-        if (data.user.is_admin) {
-          router.push('/admin')
-        } else {
-          router.push('/voting')
-        }
+        // Redirect to login page after successful signup
+        router.push('/login?message=Account created successfully! Please log in.')
       } else {
         const errorData = await response.json()
-        setError(errorData.error || 'Login failed')
+        setError(errorData.error || 'Signup failed')
       }
     } catch (error) {
-      setError('An error occurred during login')
+      setError('An error occurred during signup')
     } finally {
       setIsLoading(false)
     }
@@ -60,10 +69,10 @@ export default function LoginPage() {
             <span className="text-white font-bold text-xl">G</span>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to GGBench
+            Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Access your account to vote and manage models
+            Join GGBench to start evaluating AI-generated graphics
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -79,8 +88,8 @@ export default function LoginPage() {
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                 placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               />
             </div>
             <div className="relative">
@@ -92,10 +101,10 @@ export default function LoginPage() {
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
               <button
                 type="button"
@@ -109,13 +118,33 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
-          </div>
-
-          {successMessage && (
-            <div className="rounded-md bg-green-50 p-4">
-              <div className="text-sm text-green-700">{successMessage}</div>
+            <div className="relative">
+              <label htmlFor="confirmPassword" className="sr-only">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
+                placeholder="Confirm Password"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <Eye className="h-5 w-5 text-gray-400" />
+                )}
+              </button>
             </div>
-          )}
+          </div>
 
           {error && (
             <div className="rounded-md bg-red-50 p-4">
@@ -133,11 +162,20 @@ export default function LoginPage() {
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
               ) : (
                 <>
-                  <LogIn className="w-5 h-5 mr-2" />
-                  Sign in
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Create Account
                 </>
               )}
             </button>
+          </div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{' '}
+              <Link href="/login" className="font-medium text-primary-600 hover:text-primary-500">
+                Sign in
+              </Link>
+            </p>
           </div>
         </form>
       </div>
