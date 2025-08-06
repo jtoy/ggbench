@@ -1,33 +1,108 @@
 'use client'
 
-import { useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Check, X, ArrowLeft, ArrowRight } from 'lucide-react'
+
+interface Animation {
+  id: number
+  code: string
+  model: {
+    id: number
+    name: string
+  }
+}
+
+interface Comparison {
+  id: number
+  prompt: string
+  animationA: Animation
+  animationB: Animation
+}
 
 export default function VotingPage() {
   const [selectedVote, setSelectedVote] = useState<'A' | 'B' | null>(null)
   const [hasVoted, setHasVoted] = useState(false)
+  const [currentComparison, setCurrentComparison] = useState<Comparison | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data - in a real app this would come from an API
-  const currentComparison = {
-    id: 1,
-    prompt: "Create a futuristic cityscape with flying cars and neon lights",
-    modelA: "Claude 3.5 Sonnet",
-    modelB: "Claude 3.7 Sonnet",
-    animationA: "/api/animations/1/a", // Placeholder URLs
-    animationB: "/api/animations/1/b",
+  useEffect(() => {
+    fetchNextComparison()
+  }, [])
+
+  const fetchNextComparison = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/voting/next')
+      if (response.ok) {
+        const data = await response.json()
+        setCurrentComparison(data)
+      } else {
+        setError('No more comparisons available')
+      }
+    } catch (error) {
+      setError('Failed to load comparison')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleVote = (vote: 'A' | 'B') => {
+  const handleVote = async (vote: 'A' | 'B') => {
+    if (!currentComparison) return
+    
     setSelectedVote(vote)
     setHasVoted(true)
-    // In a real app, this would submit the vote to the backend
-    console.log(`Voted for ${vote}`)
+    
+    try {
+      const response = await fetch('/api/voting/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          animationAId: currentComparison.animationA.id,
+          animationBId: currentComparison.animationB.id,
+          winner: vote
+        })
+      })
+      
+      if (!response.ok) {
+        console.error('Failed to submit vote')
+      }
+    } catch (error) {
+      console.error('Error submitting vote:', error)
+    }
   }
 
   const handleNext = () => {
     setSelectedVote(null)
     setHasVoted(false)
-    // In a real app, this would load the next comparison
+    fetchNextComparison()
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading comparison...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !currentComparison) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            {error || 'No comparisons available'}
+          </h1>
+          <p className="text-gray-600 mb-8">
+            Check back later for new comparisons or ask an admin to generate some animations.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -48,19 +123,29 @@ export default function VotingPage() {
         <div className="space-y-4">
           <div className="text-center">
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {currentComparison.modelA}
+              {currentComparison.animationA.model.name}
             </h3>
             <div className="text-sm text-gray-500">Option A</div>
           </div>
           <div className="relative">
-            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <div className="w-8 h-8 bg-primary-600 rounded-full animate-pulse"></div>
-                </div>
-                <p className="text-gray-500">Animation Preview</p>
-                <p className="text-sm text-gray-400">Click to play</p>
-              </div>
+            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+              <iframe
+                srcDoc={`
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+                    </head>
+                    <body style="margin:0;padding:0;">
+                      <script>
+                        ${currentComparison.animationA.code}
+                      </script>
+                    </body>
+                  </html>
+                `}
+                className="w-full h-full"
+                title="Animation A"
+              />
             </div>
             {selectedVote === 'A' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -74,19 +159,29 @@ export default function VotingPage() {
         <div className="space-y-4">
           <div className="text-center">
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {currentComparison.modelB}
+              {currentComparison.animationB.model.name}
             </h3>
             <div className="text-sm text-gray-500">Option B</div>
           </div>
           <div className="relative">
-            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <div className="w-8 h-8 bg-primary-600 rounded-full animate-pulse"></div>
-                </div>
-                <p className="text-gray-500">Animation Preview</p>
-                <p className="text-sm text-gray-400">Click to play</p>
-              </div>
+            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+              <iframe
+                srcDoc={`
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+                    </head>
+                    <body style="margin:0;padding:0;">
+                      <script>
+                        ${currentComparison.animationB.code}
+                      </script>
+                    </body>
+                  </html>
+                `}
+                className="w-full h-full"
+                title="Animation B"
+              />
             </div>
             {selectedVote === 'B' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">

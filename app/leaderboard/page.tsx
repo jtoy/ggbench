@@ -7,49 +7,8 @@ export default function LeaderboardPage() {
   const [selectedType, setSelectedType] = useState('all')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
-  // Mock data - in a real app this would come from an API
-  const leaderboardData = [
-    {
-      rank: 1,
-      model: 'Claude 3.7 Sonnet',
-      eloScore: 1016,
-      winRate: 1.0,
-      votes: 1,
-      trend: 'up'
-    },
-    {
-      rank: 2,
-      model: 'Claude 3.5 Sonnet',
-      eloScore: 1000,
-      winRate: 0.0,
-      votes: 0,
-      trend: 'down'
-    },
-    {
-      rank: 3,
-      model: 'GPT-4 Vision',
-      eloScore: 985,
-      winRate: 0.8,
-      votes: 15,
-      trend: 'up'
-    },
-    {
-      rank: 4,
-      model: 'DALL-E 3',
-      eloScore: 972,
-      winRate: 0.7,
-      votes: 23,
-      trend: 'down'
-    },
-    {
-      rank: 5,
-      model: 'Midjourney v6',
-      eloScore: 945,
-      winRate: 0.6,
-      votes: 31,
-      trend: 'up'
-    }
-  ]
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   const animationTypes = [
     { value: 'all', label: 'All Types' },
@@ -59,6 +18,25 @@ export default function LeaderboardPage() {
     { value: 'character', label: 'Character' },
     { value: 'scifi', label: 'Sci-Fi' }
   ]
+
+  useEffect(() => {
+    fetchLeaderboard()
+  }, [selectedType])
+
+  const fetchLeaderboard = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/leaderboard?type=${selectedType}`)
+      if (response.ok) {
+        const data = await response.json()
+        setLeaderboardData(data)
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const getTrendIcon = (trend: string) => {
     if (trend === 'up') {
@@ -144,64 +122,71 @@ export default function LeaderboardPage() {
 
       {/* Leaderboard Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rank
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Model
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ELO Score
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Win Rate
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Votes
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trend
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {leaderboardData.map((item) => (
-                <tr key={item.rank} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getRankBadge(item.rank)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {item.model}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 font-semibold">
-                      {item.eloScore}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {item.winRate}%
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {item.votes}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getTrendIcon(item.trend)}
-                  </td>
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading leaderboard...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Rank
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Model
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ELO Score
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Win Rate
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Votes
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Trend
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {leaderboardData.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getRankBadge(index + 1)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {item.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 font-semibold">
+                        {item.elo_score}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {item.win_rate}%
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {item.total_votes}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getTrendIcon(item.trend)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Stats Section */}

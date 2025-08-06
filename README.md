@@ -31,12 +31,36 @@ A platform for comparing AI-generated graphics through community voting and ELO-
    npm install
    ```
 
-2. Run the development server:
+2. Set up your environment variables:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Then edit `.env.local` with your database credentials.
+
+3. Set up the database:
+   ```bash
+   npm run setup-db
+   ```
+   This will create the database tables and an admin user (admin/admin123).
+
+4. Run the development server:
    ```bash
    npm run dev
    ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Admin Access
+
+After running the setup script, you can log in as an admin:
+- Username: `admin`
+- Password: `admin123`
+
+The admin panel will be available at `/admin` where you can:
+- Add new LLM models with their API configurations
+- Add new prompts for animation generation
+- Generate animations using the selected model and prompt
+- View current models and their ELO rankings
 
 ## Development
 
