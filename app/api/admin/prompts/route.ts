@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import pool from '@/lib/db'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     
     if (!user || !user.is_admin) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     
     if (!user || !user.is_admin) {
       return NextResponse.json(

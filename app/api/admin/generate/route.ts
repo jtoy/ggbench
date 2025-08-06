@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import pool from '@/lib/db'
+import pool, { OPENROUTER_API_KEY } from '@/lib/db'
 
 const P5JS_SCAFFOLDING_PROMPT = `
 Generate p5.js code for the following animation description. 
@@ -16,7 +16,7 @@ Animation description: `;
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     
     if (!user || !user.is_admin) {
       return NextResponse.json(
@@ -92,20 +92,16 @@ export async function POST(request: NextRequest) {
 async function generateCodeWithLLM(model: any, promptText: string): Promise<string> {
   const fullPrompt = P5JS_SCAFFOLDING_PROMPT + promptText
   
+  if (!OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY is not configured')
+  }
+  
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${model.api_key}`
-    }
-    
-    // Parse additional headers if provided
-    if (model.additional_headers) {
-      try {
-        const additionalHeaders = JSON.parse(model.additional_headers)
-        Object.assign(headers, additionalHeaders)
-      } catch (e) {
-        console.warn('Invalid additional headers JSON:', model.additional_headers)
-      }
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000',
+      'X-Title': 'GGBench'
     }
     
     const requestBody: any = {
@@ -116,11 +112,11 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
           content: fullPrompt
         }
       ],
-      temperature: model.temperature,
-      max_tokens: model.max_tokens
+      temperature: 0.7,
+      max_tokens: 1000
     }
     
-    const response = await fetch(model.api_endpoint, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody)

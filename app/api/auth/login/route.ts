@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loginUser, generateToken } from '@/lib/auth'
-import { cookies } from 'cookies-next'
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,21 +23,24 @@ export async function POST(request: NextRequest) {
     
     const token = generateToken(user)
     
-    // Set cookie
-    cookies().set('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 // 7 days
-    })
-    
-    return NextResponse.json({
+    // Create response with cookie
+    const response = NextResponse.json({
       user: {
         id: user.id,
         username: user.username,
         is_admin: user.is_admin
       }
     })
+    
+    // Set cookie
+    response.cookies.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    })
+    
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

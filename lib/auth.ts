@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { cookies } from 'cookies-next'
 import pool from './db'
+import { NextRequest } from 'next/server'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
@@ -65,13 +66,27 @@ export async function loginUser(username: string, password: string): Promise<Use
   }
 }
 
-export async function getCurrentUser(): Promise<User | null> {
-  const token = cookies().get('token')?.value
-  if (!token) {
+export async function getCurrentUser(request?: NextRequest): Promise<User | null> {
+  try {
+    let token: string | undefined
+    
+    if (request) {
+      // If we have a request object, get token from cookies
+      token = request.cookies.get('token')?.value
+    } else {
+      // Fallback to cookies-next for client-side
+      token = cookies().get('token')?.value
+    }
+    
+    if (!token) {
+      return null
+    }
+    
+    return verifyToken(token)
+  } catch (error) {
+    console.error('Error getting current user:', error)
     return null
   }
-  
-  return verifyToken(token)
 }
 
 export async function createUser(username: string, password: string, isAdmin: boolean = false): Promise<User> {

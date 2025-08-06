@@ -32,12 +32,7 @@ export default function AdminPanel() {
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
     name: '',
-    api_type: '',
-    api_endpoint: '',
-    api_key: '',
-    temperature: 0.7,
-    max_tokens: 1000,
-    additional_headers: '{}'
+    api_type: ''
   })
 
   // Form states for adding new prompt
@@ -65,7 +60,9 @@ export default function AdminPanel() {
 
   const fetchModels = async () => {
     try {
-      const response = await fetch('/api/admin/models')
+      const response = await fetch('/api/admin/models', {
+        credentials: 'include'
+      })
       if (response.ok) {
         const data = await response.json()
         setModels(Array.isArray(data) ? data : [])
@@ -81,7 +78,9 @@ export default function AdminPanel() {
 
   const fetchPrompts = async () => {
     try {
-      const response = await fetch('/api/admin/prompts')
+      const response = await fetch('/api/admin/prompts', {
+        credentials: 'include'
+      })
       if (response.ok) {
         const data = await response.json()
         setPrompts(Array.isArray(data) ? data : [])
@@ -101,18 +100,14 @@ export default function AdminPanel() {
       const response = await fetch('/api/admin/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newModel)
       })
       
       if (response.ok) {
         setNewModel({
           name: '',
-          api_type: '',
-          api_endpoint: '',
-          api_key: '',
-          temperature: 0.7,
-          max_tokens: 1000,
-          additional_headers: '{}'
+          api_type: ''
         })
         fetchModels()
       }
@@ -128,6 +123,7 @@ export default function AdminPanel() {
       const response = await fetch('/api/admin/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           text: newPrompt.text,
           tags
@@ -154,6 +150,7 @@ export default function AdminPanel() {
       const response = await fetch('/api/admin/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           modelId: selectedModel,
           promptId: selectedPrompt
@@ -169,6 +166,29 @@ export default function AdminPanel() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading admin panel...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Error</h1>
+          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-gray-600">Please check your database connection and try again.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -217,73 +237,11 @@ export default function AdminPanel() {
               </select>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                API Endpoint
-              </label>
-              <input
-                type="url"
-                value={newModel.api_endpoint}
-                onChange={(e) => setNewModel({ ...newModel, api_endpoint: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
-            </div>
+
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                API Key
-              </label>
-              <input
-                type="password"
-                value={newModel.api_key}
-                onChange={(e) => setNewModel({ ...newModel, api_key: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                required
-              />
-            </div>
+
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Temperature
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  value={newModel.temperature}
-                  onChange={(e) => setNewModel({ ...newModel, temperature: parseFloat(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max Tokens
-                </label>
-                <input
-                  type="number"
-                  value={newModel.max_tokens}
-                  onChange={(e) => setNewModel({ ...newModel, max_tokens: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Additional Headers (JSON)
-              </label>
-              <textarea
-                value={newModel.additional_headers}
-                onChange={(e) => setNewModel({ ...newModel, additional_headers: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                rows={3}
-                placeholder='{"Authorization": "Bearer token"}'
-              />
-            </div>
+
             
             <button
               type="submit"
@@ -352,36 +310,36 @@ export default function AdminPanel() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Model
             </label>
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value ? parseInt(e.target.value) : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Choose a model</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} ({model.api_type})
-                </option>
-              ))}
-            </select>
+                         <select
+               value={selectedModel}
+               onChange={(e) => setSelectedModel(e.target.value ? parseInt(e.target.value) : '')}
+               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+             >
+               <option value="">Choose a model</option>
+               {Array.isArray(models) && models.map((model) => (
+                 <option key={model.id} value={model.id}>
+                   {model.name} ({model.api_type})
+                 </option>
+               ))}
+             </select>
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Select Prompt
             </label>
-            <select
-              value={selectedPrompt}
-              onChange={(e) => setSelectedPrompt(e.target.value ? parseInt(e.target.value) : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Choose a prompt</option>
-              {prompts.map((prompt) => (
-                <option key={prompt.id} value={prompt.id}>
-                  {prompt.text.substring(0, 50)}...
-                </option>
-              ))}
-            </select>
+                         <select
+               value={selectedPrompt}
+               onChange={(e) => setSelectedPrompt(e.target.value ? parseInt(e.target.value) : '')}
+               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+             >
+               <option value="">Choose a prompt</option>
+               {Array.isArray(prompts) && prompts.map((prompt) => (
+                 <option key={prompt.id} value={prompt.id}>
+                   {prompt.text.substring(0, 50)}...
+                 </option>
+               ))}
+             </select>
           </div>
         </div>
         
@@ -419,30 +377,30 @@ export default function AdminPanel() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {models.map((model) => (
-                <tr key={model.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {model.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {model.api_type}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {model.enabled ? model.elo_score || 1000 : 'Disabled'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      model.enabled 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {model.enabled ? 'Active' : 'Disabled'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                         <tbody className="bg-white divide-y divide-gray-200">
+               {Array.isArray(models) && models.map((model) => (
+                 <tr key={model.id}>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                     {model.name}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                     {model.api_type}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                     {model.enabled ? model.elo_score || 1000 : 'Disabled'}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap">
+                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                       model.enabled 
+                         ? 'bg-green-100 text-green-800' 
+                         : 'bg-red-100 text-red-800'
+                     }`}>
+                       {model.enabled ? 'Active' : 'Disabled'}
+                     </span>
+                   </td>
+                 </tr>
+               ))}
+             </tbody>
           </table>
         </div>
       </div>

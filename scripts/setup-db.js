@@ -1,12 +1,11 @@
+require('dotenv').config({ path: '.env' })
+
 const { Pool } = require('pg')
 const bcrypt = require('bcryptjs')
 
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'ggbench',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '5432'),
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 })
 
 async function setupDatabase() {
@@ -29,11 +28,8 @@ async function setupDatabase() {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
         api_type TEXT NOT NULL,
-        api_endpoint TEXT NOT NULL,
-        api_key TEXT NOT NULL,
         temperature REAL DEFAULT 0.7,
         max_tokens INTEGER DEFAULT 1000,
-        additional_headers JSONB DEFAULT '{}',
         elo_score INTEGER NOT NULL DEFAULT 1000,
         wins INTEGER NOT NULL DEFAULT 0,
         losses INTEGER NOT NULL DEFAULT 0,

@@ -11,11 +11,8 @@ CREATE TABLE models (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     api_type TEXT NOT NULL, -- OpenAI, Anthropic, Google, etc.
-    api_endpoint TEXT NOT NULL,
-    api_key TEXT NOT NULL,
     temperature REAL DEFAULT 0.7,
     max_tokens INTEGER DEFAULT 1000,
-    additional_headers JSONB DEFAULT '{}',
     elo_score INTEGER NOT NULL DEFAULT 1000,
     wins INTEGER NOT NULL DEFAULT 0,
     losses INTEGER NOT NULL DEFAULT 0,

@@ -33,9 +33,12 @@ A platform for comparing AI-generated graphics through community voting and ELO-
 
 2. Set up your environment variables:
    ```bash
-   cp .env.example .env.local
+   cp env.example .env.local
    ```
-   Then edit `.env.local` with your database credentials.
+   Then edit `.env.local` with your `DATABASE_URL`. For local development, you can use:
+   ```
+   DATABASE_URL=postgresql://username:password@localhost:5432/ggbench
+   ```
 
 3. Set up the database:
    ```bash

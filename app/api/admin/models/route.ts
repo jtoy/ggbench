@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import pool from '@/lib/db'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     
     if (!user || !user.is_admin) {
       return NextResponse.json(
@@ -16,7 +16,7 @@ export async function GET() {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        'SELECT id, name, api_type, api_endpoint, temperature, max_tokens, elo_score, enabled FROM models ORDER BY name'
+        'SELECT id, name, api_type, elo_score, enabled FROM models ORDER BY name'
       )
       return NextResponse.json(result.rows)
     } finally {
@@ -33,7 +33,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     
     if (!user || !user.is_admin) {
       return NextResponse.json(
@@ -42,9 +42,9 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { name, api_type, api_endpoint, api_key, temperature, max_tokens, additional_headers } = await request.json()
+    const { name, api_type } = await request.json()
     
-    if (!name || !api_type || !api_endpoint || !api_key) {
+    if (!name || !api_type) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        `INSERT INTO models (name, api_type, api_endpoint, api_key, temperature, max_tokens, additional_headers) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7) 
-         RETURNING id, name, api_type, api_endpoint, temperature, max_tokens, elo_score, enabled`,
-        [name, api_type, api_endpoint, api_key, temperature, max_tokens, additional_headers]
+        `INSERT INTO models (name, api_type) 
+         VALUES ($1, $2) 
+         RETURNING id, name, api_type, elo_score, enabled`,
+        [name, api_type]
       )
       
       return NextResponse.json(result.rows[0])
