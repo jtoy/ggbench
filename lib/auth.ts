@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { cookies } from 'cookies-next'
+import { getCookie } from 'cookies-next'
 import pool from './db'
 import { NextRequest } from 'next/server'
 
@@ -75,7 +75,7 @@ export async function getCurrentUser(request?: NextRequest): Promise<User | null
       token = request.cookies.get('token')?.value
     } else {
       // Fallback to cookies-next for client-side
-      token = cookies().get('token')?.value
+      token = getCookie('token') as string
     }
     
     if (!token) {
