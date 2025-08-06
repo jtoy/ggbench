@@ -7,9 +7,7 @@ interface Model {
   id: number
   name: string
   api_type: string
-  api_endpoint: string
-  temperature: number
-  max_tokens: number
+  elo_score: number
   enabled: boolean
 }
 
