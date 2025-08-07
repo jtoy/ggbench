@@ -112,8 +112,8 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
           content: fullPrompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 1000
+      temperature: 1.0,
+      max_tokens: null
     }
     
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
