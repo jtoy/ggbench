@@ -231,15 +231,7 @@ export default function VotingPage() {
         </div>
       )}
 
-      {/* Progress */}
-      <div className="mt-8 text-center">
-        <div className="inline-flex items-center space-x-2 text-sm text-gray-500">
-          <span>Progress: 3 of 10</span>
-          <div className="w-32 h-2 bg-gray-200 rounded-full">
-            <div className="w-1/3 h-full bg-primary-600 rounded-full"></div>
-          </div>
-        </div>
-      </div>
+
     </div>
   )
 } 
