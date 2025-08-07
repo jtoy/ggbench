@@ -39,6 +39,8 @@ export default function AdminPanel() {
   const [selectedModelAnimations, setSelectedModelAnimations] = useState<Animation[]>([])
   const [selectedModelForAnimations, setSelectedModelForAnimations] = useState<Model | null>(null)
   const [isLoadingAnimations, setIsLoadingAnimations] = useState(false)
+  const [loadedAnimationId, setLoadedAnimationId] = useState<number | null>(null)
+  const [viewingAnimation, setViewingAnimation] = useState<Animation | null>(null)
 
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
@@ -209,6 +211,25 @@ export default function AdminPanel() {
 
   const loadAnimation = (animation: Animation) => {
     setGeneratedCode(animation.code)
+    setLoadedAnimationId(animation.id)
+    // Clear the loaded animation ID after 3 seconds
+    setTimeout(() => setLoadedAnimationId(null), 3000)
+    
+    // Scroll to the generated code section
+    setTimeout(() => {
+      const generatedCodeSection = document.querySelector('[data-generated-code]')
+      if (generatedCodeSection) {
+        generatedCodeSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+  }
+
+  const viewAnimation = (animation: Animation) => {
+    setViewingAnimation(animation)
+  }
+
+  const closeAnimationView = () => {
+    setViewingAnimation(null)
   }
 
   if (isLoading) {
@@ -406,8 +427,27 @@ export default function AdminPanel() {
         </div>
         
         {generatedCode && (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generated Code</h3>
+          <div data-generated-code>
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">Generated Code</h3>
+              <button
+                onClick={() => {
+                  // Create a temporary animation object for viewing
+                  const tempAnimation: Animation = {
+                    id: 0,
+                    code: generatedCode,
+                    created_at: new Date().toISOString(),
+                    prompt_text: 'Generated Code',
+                    prompt_tags: ['generated'],
+                    model_name: 'Current Model'
+                  }
+                  viewAnimation(tempAnimation)
+                }}
+                className="btn-primary text-sm px-4 py-2"
+              >
+                View Animation
+              </button>
+            </div>
             <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
               <pre className="text-sm">{generatedCode}</pre>
             </div>
@@ -481,12 +521,19 @@ export default function AdminPanel() {
               {selectedModelAnimations.map((animation) => (
                 <div 
                   key={animation.id} 
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    loadedAnimationId === animation.id 
+                      ? 'border-green-500 bg-green-50' 
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}
                   onClick={() => loadAnimation(animation)}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900">
                       Animation #{animation.id}
+                      {loadedAnimationId === animation.id && (
+                        <span className="ml-2 text-xs text-green-600">✓ Loaded</span>
+                      )}
                     </h3>
                     <span className="text-xs text-gray-500">
                       {new Date(animation.created_at).toLocaleDateString()}
@@ -495,7 +542,7 @@ export default function AdminPanel() {
                   <p className="text-sm text-gray-600 mb-2">
                     {animation.prompt_text.substring(0, 100)}...
                   </p>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 mb-3">
                     {animation.prompt_tags.map((tag, index) => (
                       <span 
                         key={index}
@@ -505,10 +552,87 @@ export default function AdminPanel() {
                       </span>
                     ))}
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        loadAnimation(animation)
+                      }}
+                      className="btn-secondary text-xs px-3 py-1"
+                    >
+                      Load Code
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        viewAnimation(animation)
+                      }}
+                      className="btn-primary text-xs px-3 py-1"
+                    >
+                      View Animation
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Animation Viewer Modal */}
+      {viewingAnimation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Animation #{viewingAnimation.id} - {viewingAnimation.model_name}
+              </h3>
+              <button
+                onClick={closeAnimationView}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  <strong>Prompt:</strong> {viewingAnimation.prompt_text}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {viewingAnimation.prompt_tags.map((tag, index) => (
+                    <span 
+                      key={index}
+                      className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+                <iframe
+                  srcDoc={`
+                    <!DOCTYPE html>
+                    <html>
+                      <head>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+                      </head>
+                      <body style="margin:0;padding:0;">
+                        <script>
+                          ${viewingAnimation.code}
+                        </script>
+                      </body>
+                    </html>
+                  `}
+                  className="w-full h-full"
+                  title={`Animation ${viewingAnimation.id}`}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
