@@ -18,6 +18,15 @@ interface Prompt {
   tags: string[]
 }
 
+interface Animation {
+  id: number
+  code: string
+  created_at: string
+  prompt_text: string
+  prompt_tags: string[]
+  model_name: string
+}
+
 export default function AdminPanel() {
   const [models, setModels] = useState<Model[]>([])
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -27,6 +36,9 @@ export default function AdminPanel() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedModelAnimations, setSelectedModelAnimations] = useState<Animation[]>([])
+  const [selectedModelForAnimations, setSelectedModelForAnimations] = useState<Model | null>(null)
+  const [isLoadingAnimations, setIsLoadingAnimations] = useState(false)
 
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
@@ -91,6 +103,27 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error fetching prompts:', error)
       setPrompts([])
+    }
+  }
+
+  const fetchAnimationsForModel = async (modelId: number) => {
+    setIsLoadingAnimations(true)
+    try {
+      const response = await fetch(`/api/admin/animations?modelId=${modelId}`, {
+        credentials: 'include'
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setSelectedModelAnimations(Array.isArray(data) ? data : [])
+      } else {
+        console.error('Failed to fetch animations:', response.status)
+        setSelectedModelAnimations([])
+      }
+    } catch (error) {
+      console.error('Error fetching animations:', error)
+      setSelectedModelAnimations([])
+    } finally {
+      setIsLoadingAnimations(false)
     }
   }
 
@@ -167,6 +200,15 @@ export default function AdminPanel() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleModelClick = async (model: Model) => {
+    setSelectedModelForAnimations(model)
+    await fetchAnimationsForModel(model.id)
+  }
+
+  const loadAnimation = (animation: Animation) => {
+    setGeneratedCode(animation.code)
   }
 
   if (isLoading) {
@@ -389,7 +431,7 @@ export default function AdminPanel() {
             </thead>
                          <tbody className="bg-white divide-y divide-gray-200">
                {Array.isArray(models) && models.map((model) => (
-                 <tr key={model.id}>
+                 <tr key={model.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleModelClick(model)}>
                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                      {model.name}
                    </td>
@@ -417,6 +459,58 @@ export default function AdminPanel() {
           </table>
         </div>
       </div>
+
+      {/* Animations for Selected Model */}
+      {selectedModelForAnimations && (
+        <div className="card mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            Animations for {selectedModelForAnimations.name}
+          </h2>
+          
+          {isLoadingAnimations ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading animations...</p>
+            </div>
+          ) : selectedModelAnimations.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No animations found for this model.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {selectedModelAnimations.map((animation) => (
+                <div 
+                  key={animation.id} 
+                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => loadAnimation(animation)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-gray-900">
+                      Animation #{animation.id}
+                    </h3>
+                    <span className="text-xs text-gray-500">
+                      {new Date(animation.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">
+                    {animation.prompt_text.substring(0, 100)}...
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {animation.prompt_tags.map((tag, index) => (
+                      <span 
+                        key={index}
+                        className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 } 
