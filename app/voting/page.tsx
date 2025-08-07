@@ -122,9 +122,6 @@ export default function VotingPage() {
         {/* Animation A */}
         <div className="space-y-4">
           <div className="text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {currentComparison.animationA.model.name}
-            </h3>
             <div className="text-sm text-gray-500">Option A</div>
           </div>
           <div className="relative">
@@ -158,9 +155,6 @@ export default function VotingPage() {
         {/* Animation B */}
         <div className="space-y-4">
           <div className="text-center">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {currentComparison.animationB.model.name}
-            </h3>
             <div className="text-sm text-gray-500">Option B</div>
           </div>
           <div className="relative">
