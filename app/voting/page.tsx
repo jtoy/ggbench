@@ -125,7 +125,7 @@ export default function VotingPage() {
             <div className="text-sm text-gray-500">Option A</div>
           </div>
           <div className="relative">
-            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+            <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
                 srcDoc={`
                   <!DOCTYPE html>
@@ -133,7 +133,7 @@ export default function VotingPage() {
                     <head>
                       <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
                     </head>
-                    <body style="margin:0;padding:0;">
+                    <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
                       <script>
                         ${currentComparison.animationA.code}
                       </script>
@@ -158,7 +158,7 @@ export default function VotingPage() {
             <div className="text-sm text-gray-500">Option B</div>
           </div>
           <div className="relative">
-            <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+            <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
                 srcDoc={`
                   <!DOCTYPE html>
@@ -166,7 +166,7 @@ export default function VotingPage() {
                     <head>
                       <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
                     </head>
-                    <body style="margin:0;padding:0;">
+                    <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
                       <script>
                         ${currentComparison.animationB.code}
                       </script>

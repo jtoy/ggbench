@@ -612,7 +612,7 @@ export default function AdminPanel() {
                   ))}
                 </div>
               </div>
-              <div className="aspect-video bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+              <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
                 <iframe
                   srcDoc={`
                     <!DOCTYPE html>
@@ -620,7 +620,7 @@ export default function AdminPanel() {
                       <head>
                         <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
                       </head>
-                      <body style="margin:0;padding:0;">
+                      <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
                         <script>
                           ${viewingAnimation.code}
                         </script>

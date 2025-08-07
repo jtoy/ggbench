@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth'
 import pool, { OPENROUTER_API_KEY } from '@/lib/db'
 
 const P5JS_SCAFFOLDING_PROMPT = `
+Do not add any comments or text.
+Create animation that are not interactive.
 Generate p5.js code for the following animation description. 
 The code must start with:
 function setup() {
