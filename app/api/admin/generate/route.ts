@@ -79,38 +79,58 @@ export async function POST(request: NextRequest) {
           })
         }
         
-        const results = []
+                const results = []
         let successCount = 0
         let errorCount = 0
         
-        for (const prompt of promptsToGenerate.rows) {
-          try {
-            // Generate code using the LLM
-            const generatedCode = await generateCodeWithLLM(model, prompt.text)
-            
-            // Insert new animation
-            const animationResult = await client.query(
-              'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-              [modelId, prompt.id, generatedCode]
-            )
-            
-            results.push({
-              promptId: prompt.id,
-              animationId: animationResult.rows[0].id,
-              success: true
-            })
-            successCount++
-            
-            console.log(`Created animation for model ${modelId} and prompt ${prompt.id}`)
-                     } catch (error) {
-             console.error(`Error generating animation for prompt ${prompt.id}:`, error)
-             results.push({
-               promptId: prompt.id,
-               success: false,
-               error: error instanceof Error ? error.message : 'Unknown error'
-             })
-             errorCount++
-           }
+        // Process prompts in batches of 10 for concurrency
+        const batchSize = 10
+        const prompts = promptsToGenerate.rows
+        
+        for (let i = 0; i < prompts.length; i += batchSize) {
+          const batch = prompts.slice(i, i + batchSize)
+          
+          // Process batch concurrently
+          const batchPromises = batch.map(async (prompt) => {
+            try {
+              // Generate code using the LLM
+              const generatedCode = await generateCodeWithLLM(model, prompt.text)
+              
+              // Insert new animation
+              const animationResult = await client.query(
+                'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
+                [modelId, prompt.id, generatedCode]
+              )
+              
+              console.log(`Created animation for model ${modelId} and prompt ${prompt.id}`)
+              
+              return {
+                promptId: prompt.id,
+                animationId: animationResult.rows[0].id,
+                success: true
+              }
+            } catch (error) {
+              console.error(`Error generating animation for prompt ${prompt.id}:`, error)
+              return {
+                promptId: prompt.id,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            }
+          })
+          
+          // Wait for batch to complete
+          const batchResults = await Promise.all(batchPromises)
+          
+          // Count successes and failures
+          for (const result of batchResults) {
+            results.push(result)
+            if (result.success) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          }
         }
         
         return NextResponse.json({
