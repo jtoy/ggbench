@@ -32,27 +32,45 @@ export function calculateElo(ratingA: number, ratingB: number, scoreA: number): 
 export async function updateModelRatings(animationAId: number, animationBId: number, winner: 'A' | 'B' | 'TIE') {
   const client = await pool.connect()
   try {
-    // Get the animations with their model ratings
-    const result = await client.query(`
+    // Get the animations with their model ratings - fetch them separately to ensure correct mapping
+    const animationAResult = await client.query(`
       SELECT 
         a.id as animation_id,
         m.id as model_id,
+        m.name as model_name,
         m.elo_score,
         m.wins,
         m.losses,
         m.ties
       FROM animations a
       JOIN models m ON a.model_id = m.id
-      WHERE a.id IN ($1, $2)
-      ORDER BY a.id = $1 DESC
-    `, [animationAId, animationBId])
+      WHERE a.id = $1
+    `, [animationAId])
     
-    if (result.rows.length !== 2) {
+    const animationBResult = await client.query(`
+      SELECT 
+        a.id as animation_id,
+        m.id as model_id,
+        m.name as model_name,
+        m.elo_score,
+        m.wins,
+        m.losses,
+        m.ties
+      FROM animations a
+      JOIN models m ON a.model_id = m.id
+      WHERE a.id = $2
+    `, [animationBId])
+    
+    if (animationAResult.rows.length === 0 || animationBResult.rows.length === 0) {
       throw new Error('Could not find both animations')
     }
     
-    const modelA = result.rows[0]
-    const modelB = result.rows[1]
+    const modelA = animationAResult.rows[0]
+    const modelB = animationBResult.rows[0]
+    
+    console.log(`ELO Update: Animation A (${animationAId}) -> Model ${modelA.model_name} (${modelA.elo_score})`)
+    console.log(`ELO Update: Animation B (${animationBId}) -> Model ${modelB.model_name} (${modelB.elo_score})`)
+    console.log(`Winner: ${winner}`)
     
     // Determine the score based on winner
     let scoreA: number
@@ -66,6 +84,10 @@ export async function updateModelRatings(animationAId: number, animationBId: num
     
     // Calculate new ELO ratings
     const eloResult = calculateElo(modelA.elo_score, modelB.elo_score, scoreA)
+    
+    console.log(`ELO Calculation: ${modelA.elo_score} vs ${modelB.elo_score}, scoreA: ${scoreA}`)
+    console.log(`New ratings: ${modelA.model_name}: ${modelA.elo_score} -> ${eloResult.newRatingA}`)
+    console.log(`New ratings: ${modelB.model_name}: ${modelB.elo_score} -> ${eloResult.newRatingB}`)
     
     // Update model A
     const newWinsA = modelA.wins + (winner === 'A' ? 1 : 0)
@@ -88,6 +110,9 @@ export async function updateModelRatings(animationAId: number, animationBId: num
       SET elo_score = $1, wins = $2, losses = $3, ties = $4
       WHERE id = $5
     `, [eloResult.newRatingB, newWinsB, newLossesB, newTiesB, modelB.model_id])
+    
+    console.log(`Updated ${modelA.model_name}: ELO ${eloResult.newRatingA}, W:${newWinsA} L:${newLossesA} T:${newTiesA}`)
+    console.log(`Updated ${modelB.model_name}: ELO ${eloResult.newRatingB}, W:${newWinsB} L:${newLossesB} T:${newTiesB}`)
     
     return {
       modelA: {
