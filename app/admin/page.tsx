@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Play, Save, Trash2, Settings } from 'lucide-react'
+import { Plus, Play, Save, Trash2, Settings, RotateCcw } from 'lucide-react'
 
 interface Model {
   id: number
@@ -41,6 +41,7 @@ export default function AdminPanel() {
   const [isLoadingAnimations, setIsLoadingAnimations] = useState(false)
   const [loadedAnimationId, setLoadedAnimationId] = useState<number | null>(null)
   const [viewingAnimation, setViewingAnimation] = useState<Animation | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
@@ -230,6 +231,11 @@ export default function AdminPanel() {
 
   const closeAnimationView = () => {
     setViewingAnimation(null)
+    setRefreshKey(prev => prev + 1)
+  }
+
+  const refreshAnimation = () => {
+    setRefreshKey(prev => prev + 1)
   }
 
   if (isLoading) {
@@ -612,8 +618,9 @@ export default function AdminPanel() {
                   ))}
                 </div>
               </div>
-              <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
+              <div className="relative w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
                 <iframe
+                  key={`admin-animation-${refreshKey}`}
                   srcDoc={`
                     <!DOCTYPE html>
                     <html>
@@ -630,6 +637,13 @@ export default function AdminPanel() {
                   className="w-full h-full"
                   title={`Animation ${viewingAnimation.id}`}
                 />
+                <button
+                  onClick={refreshAnimation}
+                  className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
+                  title="Refresh Animation"
+                >
+                  <RotateCcw className="w-4 h-4 text-gray-700" />
+                </button>
               </div>
             </div>
           </div>

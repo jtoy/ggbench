@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Check, X, ArrowLeft, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Check, X, ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react'
 
 interface Animation {
   id: number
@@ -25,6 +25,9 @@ export default function VotingPage() {
   const [currentComparison, setCurrentComparison] = useState<Comparison | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showModelNames, setShowModelNames] = useState(false)
+  const [refreshKeyA, setRefreshKeyA] = useState(0)
+  const [refreshKeyB, setRefreshKeyB] = useState(0)
 
   useEffect(() => {
     fetchNextComparison()
@@ -71,12 +74,29 @@ export default function VotingPage() {
     } catch (error) {
       console.error('Error submitting vote:', error)
     }
+
+    // Show model names for 3 seconds after voting
+    setShowModelNames(true)
+    setTimeout(() => {
+      setShowModelNames(false)
+      handleNext()
+    }, 3000)
   }
 
   const handleNext = () => {
     setSelectedVote(null)
     setHasVoted(false)
+    setRefreshKeyA(prev => prev + 1)
+    setRefreshKeyB(prev => prev + 1)
     fetchNextComparison()
+  }
+
+  const refreshAnimationA = () => {
+    setRefreshKeyA(prev => prev + 1)
+  }
+
+  const refreshAnimationB = () => {
+    setRefreshKeyB(prev => prev + 1)
   }
 
   if (isLoading) {
@@ -123,10 +143,16 @@ export default function VotingPage() {
         <div className="space-y-4">
           <div className="text-center">
             <div className="text-sm text-gray-500">Option A</div>
+            {showModelNames && (
+              <div className="text-lg font-semibold text-blue-600 mt-2">
+                Model: {currentComparison.animationA.model.name}
+              </div>
+            )}
           </div>
           <div className="relative">
             <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
+                key={`animationA-${refreshKeyA}`}
                 srcDoc={`
                   <!DOCTYPE html>
                   <html>
@@ -144,6 +170,13 @@ export default function VotingPage() {
                 title="Animation A"
               />
             </div>
+            <button
+              onClick={refreshAnimationA}
+              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
+              title="Refresh Animation A"
+            >
+              <RotateCcw className="w-4 h-4 text-gray-700" />
+            </button>
             {selectedVote === 'A' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
                 <Check className="w-5 h-5 text-white" />
@@ -156,10 +189,16 @@ export default function VotingPage() {
         <div className="space-y-4">
           <div className="text-center">
             <div className="text-sm text-gray-500">Option B</div>
+            {showModelNames && (
+              <div className="text-lg font-semibold text-blue-600 mt-2">
+                Model: {currentComparison.animationB.model.name}
+              </div>
+            )}
           </div>
           <div className="relative">
             <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
+                key={`animationB-${refreshKeyB}`}
                 srcDoc={`
                   <!DOCTYPE html>
                   <html>
@@ -177,6 +216,13 @@ export default function VotingPage() {
                 title="Animation B"
               />
             </div>
+            <button
+              onClick={refreshAnimationB}
+              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
+              title="Refresh Animation B"
+            >
+              <RotateCcw className="w-4 h-4 text-gray-700" />
+            </button>
             {selectedVote === 'B' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
                 <Check className="w-5 h-5 text-white" />
@@ -219,15 +265,12 @@ export default function VotingPage() {
         </button>
       </div>
 
-      {/* Next Button */}
-      {hasVoted && (
+      {/* Auto-advance message */}
+      {hasVoted && showModelNames && (
         <div className="text-center">
-          <button
-            onClick={handleNext}
-            className="btn-primary px-8 py-3 text-lg"
-          >
-            Next Comparison
-          </button>
+          <p className="text-gray-600">
+            Loading next comparison in 5 seconds...
+          </p>
         </div>
       )}
 
