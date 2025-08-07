@@ -104,3 +104,11 @@ ggbench/
 ```
 
 # TODO
+
+
+
+# contacts
+andrej
+claude jack
+david ha
+simonwillson

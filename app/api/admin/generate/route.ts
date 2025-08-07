@@ -27,11 +27,18 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { modelId, promptId } = await request.json()
+    const { modelId, promptId, generateForAllPrompts } = await request.json()
     
-    if (!modelId || !promptId) {
+    if (!modelId) {
       return NextResponse.json(
-        { error: 'Model ID and Prompt ID are required' },
+        { error: 'Model ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (!generateForAllPrompts && !promptId) {
+      return NextResponse.json(
+        { error: 'Prompt ID is required when not generating for all prompts' },
         { status: 400 }
       )
     }
@@ -44,11 +51,6 @@ export async function POST(request: NextRequest) {
         [modelId]
       )
       
-      const promptResult = await client.query(
-        'SELECT * FROM prompts WHERE id = $1',
-        [promptId]
-      )
-      
       if (modelResult.rows.length === 0) {
         return NextResponse.json(
           { error: 'Model not found or disabled' },
@@ -56,46 +58,114 @@ export async function POST(request: NextRequest) {
         )
       }
       
-      if (promptResult.rows.length === 0) {
-        return NextResponse.json(
-          { error: 'Prompt not found' },
-          { status: 404 }
-        )
-      }
-      
       const model = modelResult.rows[0]
-      const prompt = promptResult.rows[0]
       
-      // Generate code using the LLM
-      const generatedCode = await generateCodeWithLLM(model, prompt.text)
-      
-      // Check if animation already exists for this model_id and prompt_id combination
-      const existingAnimation = await client.query(
-        'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2',
-        [modelId, promptId]
-      )
-
-      let animationResult
-      if (existingAnimation.rows.length > 0) {
-        // Update existing animation
-        animationResult = await client.query(
-          'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 RETURNING id',
-          [generatedCode, modelId, promptId]
+      if (generateForAllPrompts) {
+        // Get all prompts that don't have animations for this model
+        const promptsToGenerate = await client.query(
+          `SELECT p.id, p.text 
+           FROM prompts p 
+           WHERE NOT EXISTS (
+             SELECT 1 FROM animations a 
+             WHERE a.model_id = $1 AND a.prompt_id = p.id
+           )`,
+          [modelId]
         )
-        console.log(`Updated existing animation for model ${modelId} and prompt ${promptId}`)
+        
+        if (promptsToGenerate.rows.length === 0) {
+          return NextResponse.json({
+            message: 'All prompts already have animations for this model',
+            generatedCount: 0
+          })
+        }
+        
+        const results = []
+        let successCount = 0
+        let errorCount = 0
+        
+        for (const prompt of promptsToGenerate.rows) {
+          try {
+            // Generate code using the LLM
+            const generatedCode = await generateCodeWithLLM(model, prompt.text)
+            
+            // Insert new animation
+            const animationResult = await client.query(
+              'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
+              [modelId, prompt.id, generatedCode]
+            )
+            
+            results.push({
+              promptId: prompt.id,
+              animationId: animationResult.rows[0].id,
+              success: true
+            })
+            successCount++
+            
+            console.log(`Created animation for model ${modelId} and prompt ${prompt.id}`)
+                     } catch (error) {
+             console.error(`Error generating animation for prompt ${prompt.id}:`, error)
+             results.push({
+               promptId: prompt.id,
+               success: false,
+               error: error instanceof Error ? error.message : 'Unknown error'
+             })
+             errorCount++
+           }
+        }
+        
+        return NextResponse.json({
+          message: `Generated ${successCount} animations, ${errorCount} failed`,
+          generatedCount: successCount,
+          errorCount,
+          results
+        })
       } else {
-        // Insert new animation
-        animationResult = await client.query(
-          'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-          [modelId, promptId, generatedCode]
+        // Single prompt generation
+        const promptResult = await client.query(
+          'SELECT * FROM prompts WHERE id = $1',
+          [promptId]
         )
-        console.log(`Created new animation for model ${modelId} and prompt ${promptId}`)
+        
+        if (promptResult.rows.length === 0) {
+          return NextResponse.json(
+            { error: 'Prompt not found' },
+            { status: 404 }
+          )
+        }
+        
+        const prompt = promptResult.rows[0]
+        
+        // Generate code using the LLM
+        const generatedCode = await generateCodeWithLLM(model, prompt.text)
+        
+        // Check if animation already exists for this model_id and prompt_id combination
+        const existingAnimation = await client.query(
+          'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2',
+          [modelId, promptId]
+        )
+
+        let animationResult
+        if (existingAnimation.rows.length > 0) {
+          // Update existing animation
+          animationResult = await client.query(
+            'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 RETURNING id',
+            [generatedCode, modelId, promptId]
+          )
+          console.log(`Updated existing animation for model ${modelId} and prompt ${promptId}`)
+        } else {
+          // Insert new animation
+          animationResult = await client.query(
+            'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
+            [modelId, promptId, generatedCode]
+          )
+          console.log(`Created new animation for model ${modelId} and prompt ${promptId}`)
+        }
+        
+        return NextResponse.json({
+          code: generatedCode,
+          animationId: animationResult.rows[0].id
+        })
       }
-      
-      return NextResponse.json({
-        code: generatedCode,
-        animationId: animationResult.rows[0].id
-      })
     } finally {
       client.release()
     }

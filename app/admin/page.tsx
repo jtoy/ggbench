@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Play, Save, Trash2, Settings, RotateCcw } from 'lucide-react'
+import { Plus, Play, Save, Trash2, Settings } from 'lucide-react'
 
 interface Model {
   id: number
@@ -18,15 +18,6 @@ interface Prompt {
   tags: string[]
 }
 
-interface Animation {
-  id: number
-  code: string
-  created_at: string
-  prompt_text: string
-  prompt_tags: string[]
-  model_name: string
-}
-
 export default function AdminPanel() {
   const [models, setModels] = useState<Model[]>([])
   const [prompts, setPrompts] = useState<Prompt[]>([])
@@ -34,14 +25,9 @@ export default function AdminPanel() {
   const [selectedPrompt, setSelectedPrompt] = useState<number | ''>('')
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isGeneratingForAll, setIsGeneratingForAll] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedModelAnimations, setSelectedModelAnimations] = useState<Animation[]>([])
-  const [selectedModelForAnimations, setSelectedModelForAnimations] = useState<Model | null>(null)
-  const [isLoadingAnimations, setIsLoadingAnimations] = useState(false)
-  const [loadedAnimationId, setLoadedAnimationId] = useState<number | null>(null)
-  const [viewingAnimation, setViewingAnimation] = useState<Animation | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
@@ -106,27 +92,6 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error fetching prompts:', error)
       setPrompts([])
-    }
-  }
-
-  const fetchAnimationsForModel = async (modelId: number) => {
-    setIsLoadingAnimations(true)
-    try {
-      const response = await fetch(`/api/admin/animations?modelId=${modelId}`, {
-        credentials: 'include'
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setSelectedModelAnimations(Array.isArray(data) ? data : [])
-      } else {
-        console.error('Failed to fetch animations:', response.status)
-        setSelectedModelAnimations([])
-      }
-    } catch (error) {
-      console.error('Error fetching animations:', error)
-      setSelectedModelAnimations([])
-    } finally {
-      setIsLoadingAnimations(false)
     }
   }
 
@@ -205,37 +170,46 @@ export default function AdminPanel() {
     }
   }
 
-  const handleModelClick = async (model: Model) => {
-    setSelectedModelForAnimations(model)
-    await fetchAnimationsForModel(model.id)
-  }
+  const generateForAllPrompts = async () => {
+    if (!selectedModel) {
+      alert('Please select a model')
+      return
+    }
 
-  const loadAnimation = (animation: Animation) => {
-    setGeneratedCode(animation.code)
-    setLoadedAnimationId(animation.id)
-    // Clear the loaded animation ID after 3 seconds
-    setTimeout(() => setLoadedAnimationId(null), 3000)
+    const confirmed = window.confirm(
+      `Are you sure you want to generate animations for ALL prompts that don't have animations for the selected model? This may take a while.`
+    )
     
-    // Scroll to the generated code section
-    setTimeout(() => {
-      const generatedCodeSection = document.querySelector('[data-generated-code]')
-      if (generatedCodeSection) {
-        generatedCodeSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (!confirmed) {
+      return
+    }
+
+    setIsGeneratingForAll(true)
+    try {
+      const response = await fetch('/api/admin/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          modelId: selectedModel,
+          generateForAllPrompts: true
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        alert(data.message)
+        setGeneratedCode('') // Clear any previous single generation
+      } else {
+        const errorData = await response.json()
+        alert(`Error: ${errorData.error}`)
       }
-    }, 100)
-  }
-
-  const viewAnimation = (animation: Animation) => {
-    setViewingAnimation(animation)
-  }
-
-  const closeAnimationView = () => {
-    setViewingAnimation(null)
-    setRefreshKey(prev => prev + 1)
-  }
-
-  const refreshAnimation = () => {
-    setRefreshKey(prev => prev + 1)
+    } catch (error) {
+      console.error('Error generating animations for all prompts:', error)
+      alert('Error generating animations for all prompts')
+    } finally {
+      setIsGeneratingForAll(false)
+    }
   }
 
   if (isLoading) {
@@ -421,39 +395,29 @@ export default function AdminPanel() {
           </div>
         </div>
         
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center gap-4 mb-6">
           <button
             onClick={generateAnimation}
-            disabled={isGenerating || !selectedModel || !selectedPrompt}
+            disabled={isGenerating || isGeneratingForAll || !selectedModel || !selectedPrompt}
             className="btn-primary flex items-center px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
             {isGenerating ? 'Generating...' : 'Generate Animation'}
           </button>
+          
+          <button
+            onClick={generateForAllPrompts}
+            disabled={isGenerating || isGeneratingForAll || !selectedModel}
+            className="btn-secondary flex items-center px-6 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Play className="w-5 h-5 mr-2" />
+            {isGeneratingForAll ? 'Generating for All...' : 'Generate for All Prompts'}
+          </button>
         </div>
         
         {generatedCode && (
-          <div data-generated-code>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Generated Code</h3>
-              <button
-                onClick={() => {
-                  // Create a temporary animation object for viewing
-                  const tempAnimation: Animation = {
-                    id: 0,
-                    code: generatedCode,
-                    created_at: new Date().toISOString(),
-                    prompt_text: 'Generated Code',
-                    prompt_tags: ['generated'],
-                    model_name: 'Current Model'
-                  }
-                  viewAnimation(tempAnimation)
-                }}
-                className="btn-primary text-sm px-4 py-2"
-              >
-                View Animation
-              </button>
-            </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generated Code</h3>
             <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
               <pre className="text-sm">{generatedCode}</pre>
             </div>
@@ -477,7 +441,7 @@ export default function AdminPanel() {
             </thead>
                          <tbody className="bg-white divide-y divide-gray-200">
                {Array.isArray(models) && models.map((model) => (
-                 <tr key={model.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleModelClick(model)}>
+                 <tr key={model.id}>
                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                      {model.name}
                    </td>
@@ -505,150 +469,6 @@ export default function AdminPanel() {
           </table>
         </div>
       </div>
-
-      {/* Animations for Selected Model */}
-      {selectedModelForAnimations && (
-        <div className="card mt-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Animations for {selectedModelForAnimations.name}
-          </h2>
-          
-          {isLoadingAnimations ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading animations...</p>
-            </div>
-          ) : selectedModelAnimations.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No animations found for this model.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {selectedModelAnimations.map((animation) => (
-                <div 
-                  key={animation.id} 
-                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                    loadedAnimationId === animation.id 
-                      ? 'border-green-500 bg-green-50' 
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                  onClick={() => loadAnimation(animation)}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-gray-900">
-                      Animation #{animation.id}
-                      {loadedAnimationId === animation.id && (
-                        <span className="ml-2 text-xs text-green-600">✓ Loaded</span>
-                      )}
-                    </h3>
-                    <span className="text-xs text-gray-500">
-                      {new Date(animation.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {animation.prompt_text.substring(0, 100)}...
-                  </p>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {animation.prompt_tags.map((tag, index) => (
-                      <span 
-                        key={index}
-                        className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        loadAnimation(animation)
-                      }}
-                      className="btn-secondary text-xs px-3 py-1"
-                    >
-                      Load Code
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        viewAnimation(animation)
-                      }}
-                      className="btn-primary text-xs px-3 py-1"
-                    >
-                      View Animation
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Animation Viewer Modal */}
-      {viewingAnimation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Animation #{viewingAnimation.id} - {viewingAnimation.model_name}
-              </h3>
-              <button
-                onClick={closeAnimationView}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-4">
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  <strong>Prompt:</strong> {viewingAnimation.prompt_text}
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {viewingAnimation.prompt_tags.map((tag, index) => (
-                    <span 
-                      key={index}
-                      className="inline-flex px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="relative w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
-                <iframe
-                  key={`admin-animation-${refreshKey}`}
-                  srcDoc={`
-                    <!DOCTYPE html>
-                    <html>
-                      <head>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-                      </head>
-                      <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
-                        <script>
-                          ${viewingAnimation.code}
-                        </script>
-                      </body>
-                    </html>
-                  `}
-                  className="w-full h-full"
-                  title={`Animation ${viewingAnimation.id}`}
-                />
-                <button
-                  onClick={refreshAnimation}
-                  className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
-                  title="Refresh Animation"
-                >
-                  <RotateCcw className="w-4 h-4 text-gray-700" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 } 
