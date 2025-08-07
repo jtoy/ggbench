@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
           m.ties,
           CASE 
             WHEN (m.wins + m.losses + m.ties) = 0 THEN 0
-            ELSE ROUND((m.wins::float / (m.wins + m.losses + m.ties)) * 100, 1)
+            ELSE ROUND(((m.wins::numeric / (m.wins + m.losses + m.ties)) * 100)::numeric, 1)
           END as win_rate,
           (m.wins + m.losses + m.ties) as total_votes,
           CASE 
