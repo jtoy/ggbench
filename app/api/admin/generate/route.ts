@@ -105,7 +105,7 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
     }
     
     const requestBody: any = {
-      model: model.name,
+      model: model.api_endpoint || model.name,
       messages: [
         {
           role: 'user',
