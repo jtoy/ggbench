@@ -69,11 +69,28 @@ export async function POST(request: NextRequest) {
       // Generate code using the LLM
       const generatedCode = await generateCodeWithLLM(model, prompt.text)
       
-      // Save the animation to database
-      const animationResult = await client.query(
-        'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-        [modelId, promptId, generatedCode]
+      // Check if animation already exists for this model_id and prompt_id combination
+      const existingAnimation = await client.query(
+        'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2',
+        [modelId, promptId]
       )
+
+      let animationResult
+      if (existingAnimation.rows.length > 0) {
+        // Update existing animation
+        animationResult = await client.query(
+          'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 RETURNING id',
+          [generatedCode, modelId, promptId]
+        )
+        console.log(`Updated existing animation for model ${modelId} and prompt ${promptId}`)
+      } else {
+        // Insert new animation
+        animationResult = await client.query(
+          'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
+          [modelId, promptId, generatedCode]
+        )
+        console.log(`Created new animation for model ${modelId} and prompt ${promptId}`)
+      }
       
       return NextResponse.json({
         code: generatedCode,
