@@ -60,10 +60,20 @@ After running the setup script, you can log in as an admin:
 - Password: `admin123`
 
 The admin panel will be available at `/admin` where you can:
-- Add new LLM models with their API configurations
+- Add new LLM models with their API configurations and endpoints
 - Add new prompts for animation generation
 - Generate animations using the selected model and prompt
 - View current models and their ELO rankings
+
+## Database Migrations
+
+If you're updating an existing database, run the migration to add the new `api_endpoint` field:
+
+```bash
+npm run migrate-api-endpoint
+```
+
+This will add the `api_endpoint` column to the models table for storing API endpoint URLs.
 
 ## Development
 
@@ -93,13 +103,4 @@ ggbench/
 └── package.json          # Dependencies and scripts
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## License
-
-MIT License 
+# TODO

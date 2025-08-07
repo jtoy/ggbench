@@ -7,6 +7,7 @@ interface Model {
   id: number
   name: string
   api_type: string
+  api_endpoint?: string
   elo_score: number
   enabled: boolean
 }
@@ -30,7 +31,8 @@ export default function AdminPanel() {
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
     name: '',
-    api_type: ''
+    api_type: '',
+    api_endpoint: ''
   })
 
   // Form states for adding new prompt
@@ -105,7 +107,8 @@ export default function AdminPanel() {
       if (response.ok) {
         setNewModel({
           name: '',
-          api_type: ''
+          api_type: '',
+          api_endpoint: ''
         })
         fetchModels()
       }
@@ -231,15 +234,23 @@ export default function AdminPanel() {
                 <option value="OpenAI">OpenAI</option>
                 <option value="Anthropic">Anthropic</option>
                 <option value="Google">Google</option>
+                <option value="OpenRouter">OpenRouter</option>
                 <option value="Custom">Custom</option>
               </select>
             </div>
             
-
-            
-
-            
-
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                API Endpoint
+              </label>
+              <input
+                type="text"
+                value={newModel.api_endpoint}
+                onChange={(e) => setNewModel({ ...newModel, api_endpoint: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="https://api.openai.com/v1/chat/completions"
+              />
+            </div>
             
             <button
               type="submit"
@@ -371,6 +382,7 @@ export default function AdminPanel() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Endpoint</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ELO Score</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               </tr>
@@ -383,6 +395,9 @@ export default function AdminPanel() {
                    </td>
                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                      {model.api_type}
+                   </td>
+                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                     {model.api_endpoint || '-'}
                    </td>
                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                      {model.enabled ? model.elo_score || 1000 : 'Disabled'}

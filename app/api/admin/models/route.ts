@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        'SELECT id, name, api_type, elo_score, enabled FROM models ORDER BY name'
+        'SELECT id, name, api_type, api_endpoint, temperature, max_tokens, elo_score, enabled FROM models ORDER BY name'
       )
       return NextResponse.json(result.rows)
     } finally {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { name, api_type } = await request.json()
+    const { name, api_type, api_endpoint, temperature, max_tokens } = await request.json()
     
     if (!name || !api_type) {
       return NextResponse.json(
@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        `INSERT INTO models (name, api_type) 
-         VALUES ($1, $2) 
-         RETURNING id, name, api_type, elo_score, enabled`,
-        [name, api_type]
+        `INSERT INTO models (name, api_type, api_endpoint, temperature, max_tokens) 
+         VALUES ($1, $2, $3, $4, $5) 
+         RETURNING id, name, api_type, api_endpoint, temperature, max_tokens, elo_score, enabled`,
+        [name, api_type, api_endpoint, temperature, max_tokens]
       )
       
       return NextResponse.json(result.rows[0])

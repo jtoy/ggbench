@@ -75,7 +75,13 @@ export async function getCurrentUser(request?: NextRequest): Promise<User | null
       token = request.cookies.get('token')?.value
     } else {
       // Fallback to cookies-next for client-side
-      token = getCookie('token') as string
+      try {
+        token = getCookie('token') as string
+      } catch (error) {
+        // If cookies-next fails (e.g., on server side), return null
+        console.warn('Failed to get token from cookies-next:', error)
+        return null
+      }
     }
     
     if (!token) {

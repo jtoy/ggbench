@@ -11,6 +11,7 @@ CREATE TABLE models (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     api_type TEXT NOT NULL, -- OpenAI, Anthropic, Google, etc.
+    api_endpoint TEXT, -- API endpoint URL for the model
     temperature REAL DEFAULT 0.7,
     max_tokens INTEGER DEFAULT 1000,
     elo_score INTEGER NOT NULL DEFAULT 1000,
