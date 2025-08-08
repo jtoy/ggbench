@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Play, Save, Trash2, Settings } from 'lucide-react'
+import Link from 'next/link'
 
 interface Model {
   id: number
@@ -28,6 +29,7 @@ export default function AdminPanel() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingForAll, setIsGeneratingForAll] = useState(false)
+  const [isOverwritingAll, setIsOverwritingAll] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -330,6 +332,45 @@ export default function AdminPanel() {
     }
   }
 
+  const generateForAllPromptsOverwrite = async () => {
+    if (!selectedModel) {
+      alert('Please select a model')
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to GENERATE for ALL prompts for this model and OVERWRITE existing animations? This may take a while and cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setIsOverwritingAll(true)
+    try {
+      const response = await fetch('/api/admin/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          modelId: selectedModel,
+          overwriteAllPrompts: true
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(data.message)
+        setGeneratedCode('')
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        alert(`Error: ${errorData.error || 'Failed to generate'}`)
+      }
+    } catch (error) {
+      console.error('Error overwriting animations for all prompts:', error)
+      alert('Error overwriting animations for all prompts')
+    } finally {
+      setIsOverwritingAll(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -628,11 +669,11 @@ export default function AdminPanel() {
           </div>
         </div>
         
-        <div className="flex justify-center gap-4 mb-6">
+        <div className="flex justify-start items-center gap-3 flex-wrap mb-6">
           <button
             onClick={generateAnimation}
             disabled={isGenerating || isGeneratingForAll || !selectedModel || !selectedPrompt}
-            className="btn-primary flex items-center px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
             {isGenerating ? 'Generating...' : 'Generate Animation'}
@@ -641,10 +682,19 @@ export default function AdminPanel() {
           <button
             onClick={generateForAllPrompts}
             disabled={isGenerating || isGeneratingForAll || !selectedModel}
-            className="btn-secondary flex items-center px-6 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-secondary inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
             {isGeneratingForAll ? 'Generating for All...' : 'Generate for All Prompts'}
+          </button>
+
+          <button
+            onClick={generateForAllPromptsOverwrite}
+            disabled={isGenerating || isGeneratingForAll || isOverwritingAll || !selectedModel}
+            className="btn-danger inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Play className="w-5 h-5 mr-2" />
+            {isOverwritingAll ? 'Overwriting All...' : 'Generate for All Prompts (Overwrite)'}
           </button>
         </div>
         
@@ -676,7 +726,9 @@ export default function AdminPanel() {
                {Array.isArray(models) && models.map((model) => (
                  <tr key={model.id}>
                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                     {model.name}
+                     <Link className="text-primary-600 hover:underline" href={`/admin/model_gallery/${model.id}`}>
+                       {model.name}
+                     </Link>
                    </td>
                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                      {model.api_type}

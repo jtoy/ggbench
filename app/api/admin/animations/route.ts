@@ -28,11 +28,33 @@ export async function GET(request: NextRequest) {
       const result = await client.query(
         `SELECT 
           a.id,
+          a.model_id,
+          a.prompt_id,
           a.code,
           a.created_at,
-          p.text as prompt_text,
-          p.tags as prompt_tags,
-          m.name as model_name
+          p.text AS prompt_text,
+          p.tags AS prompt_tags,
+          m.name AS model_name,
+          -- Vote aggregates per animation
+          COALESCE((
+            SELECT COUNT(*) FROM votes v
+            WHERE v.animation_a_id = a.id OR v.animation_b_id = a.id
+          ), 0) AS total_votes,
+          COALESCE((
+            SELECT COUNT(*) FROM votes v
+            WHERE (v.animation_a_id = a.id AND v.winner = 'A')
+               OR (v.animation_b_id = a.id AND v.winner = 'B')
+          ), 0) AS wins,
+          COALESCE((
+            SELECT COUNT(*) FROM votes v
+            WHERE (v.animation_a_id = a.id AND v.winner = 'B')
+               OR (v.animation_b_id = a.id AND v.winner = 'A')
+          ), 0) AS losses,
+          COALESCE((
+            SELECT COUNT(*) FROM votes v
+            WHERE (v.animation_a_id = a.id OR v.animation_b_id = a.id)
+              AND v.winner = 'TIE'
+          ), 0) AS ties
         FROM animations a
         JOIN prompts p ON a.prompt_id = p.id
         JOIN models m ON a.model_id = m.id
