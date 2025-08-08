@@ -58,7 +58,7 @@ export async function updateModelRatings(animationAId: number, animationBId: num
         m.ties
       FROM animations a
       JOIN models m ON a.model_id = m.id
-      WHERE a.id = $2
+      WHERE a.id = $1
     `, [animationBId])
     
     if (animationAResult.rows.length === 0 || animationBResult.rows.length === 0) {
