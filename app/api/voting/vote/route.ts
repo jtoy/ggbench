@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { updateModelRatings } from '@/lib/elo'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+
 export async function POST(request: NextRequest) {
   try {
     const { animationAId, animationBId, winner } = await request.json()
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         eloUpdate
-      })
+      }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
     } finally {
       client.release()
     }
@@ -42,7 +46,7 @@ export async function POST(request: NextRequest) {
     console.error('Error submitting vote:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     )
   }
 } 

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+
 export async function GET() {
   try {
     const client = await pool.connect()
@@ -41,7 +45,7 @@ export async function GET() {
       if (result.rows.length === 0) {
         return NextResponse.json(
           { error: 'No more comparisons available' },
-          { status: 404 }
+          { status: 404, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
         )
       }
       
@@ -66,7 +70,7 @@ export async function GET() {
             name: row.model_b_name
           }
         }
-      })
+      }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
     } finally {
       client.release()
     }
@@ -74,7 +78,7 @@ export async function GET() {
     console.error('Error fetching next comparison:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     )
   }
 } 
