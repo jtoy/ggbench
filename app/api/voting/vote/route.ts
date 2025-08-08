@@ -22,20 +22,6 @@ export async function POST(request: NextRequest) {
     
     const client = await pool.connect()
     try {
-      // Check if this vote already exists
-      const existingVote = await client.query(`
-        SELECT id FROM votes 
-        WHERE (animation_a_id = $1 AND animation_b_id = $2)
-        OR (animation_a_id = $2 AND animation_b_id = $1)
-      `, [animationAId, animationBId])
-      
-      if (existingVote.rows.length > 0) {
-        return NextResponse.json(
-          { error: 'Vote already exists for this comparison' },
-          { status: 409 }
-        )
-      }
-      
       // Insert the vote
       await client.query(`
         INSERT INTO votes (animation_a_id, animation_b_id, winner)
