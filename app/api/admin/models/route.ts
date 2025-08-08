@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import pool from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request)
@@ -137,6 +140,95 @@ export async function PUT(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error updating model:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+
+    if (!user || !user.is_admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Support ID in JSON body or as a query param (?id=)
+    let id: number | null = null
+    try {
+      const body = await request.json().catch(() => null as unknown)
+      if (body && typeof (body as any).id !== 'undefined') {
+        id = Number((body as any).id)
+      }
+    } catch {
+      // ignore JSON parse errors, we may have it in query params
+    }
+
+    if (!id) {
+      const { searchParams } = new URL(request.url)
+      const qp = searchParams.get('id')
+      if (qp) id = Number(qp)
+    }
+
+    if (!id || Number.isNaN(id)) {
+      return NextResponse.json(
+        { error: 'Model id is required' },
+        { status: 400 }
+      )
+    }
+
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      // Delete votes that reference any animations belonging to this model
+      await client.query(
+        `DELETE FROM votes v
+         USING animations a
+         WHERE (v.animation_a_id = a.id OR v.animation_b_id = a.id)
+           AND a.model_id = $1`,
+        [id]
+      )
+
+      // Delete animations for this model
+      await client.query(
+        `DELETE FROM animations WHERE model_id = $1`,
+        [id]
+      )
+
+      // Finally delete the model itself
+      const result = await client.query(
+        `DELETE FROM models WHERE id = $1 RETURNING id`,
+        [id]
+      )
+
+      if (result.rowCount === 0) {
+        await client.query('ROLLBACK')
+        return NextResponse.json(
+          { error: 'Model not found' },
+          { status: 404 }
+        )
+      }
+
+      await client.query('COMMIT')
+      return NextResponse.json({ success: true })
+    } catch (e) {
+      await client.query('ROLLBACK')
+      console.error('Error deleting model:', e)
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error deleting model:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

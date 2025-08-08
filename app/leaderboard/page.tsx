@@ -1,32 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, Trophy, TrendingUp, TrendingDown } from 'lucide-react'
+import { Trophy, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function LeaderboardPage() {
-  const [selectedType, setSelectedType] = useState('all')
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-
   const [leaderboardData, setLeaderboardData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const animationTypes = [
-    { value: 'all', label: 'All Types' },
-    { value: 'cityscape', label: 'Cityscape' },
-    { value: 'nature', label: 'Nature' },
-    { value: 'abstract', label: 'Abstract' },
-    { value: 'character', label: 'Character' },
-    { value: 'scifi', label: 'Sci-Fi' }
-  ]
-
   useEffect(() => {
     fetchLeaderboard()
-  }, [selectedType])
+  }, [])
 
   const fetchLeaderboard = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/leaderboard?type=${selectedType}`)
+      const response = await fetch(`/api/leaderboard`)
       if (response.ok) {
         const data = await response.json()
         setLeaderboardData(data)
@@ -81,43 +69,6 @@ export default function LeaderboardPage() {
         <p className="text-gray-600">
           See how different AI models perform in generating graphics across various categories.
         </p>
-      </div>
-
-      {/* Filter Section */}
-      <div className="mb-6">
-        <div className="flex items-center space-x-4">
-          <label className="text-sm font-medium text-gray-700">Animation Type:</label>
-          <div className="relative">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <span>
-                {animationTypes.find(type => type.value === selectedType)?.label}
-              </span>
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
-                {animationTypes.map((type) => (
-                  <button
-                    key={type.value}
-                    onClick={() => {
-                      setSelectedType(type.value)
-                      setIsDropdownOpen(false)
-                    }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                      selectedType === type.value ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
-                    }`}
-                  >
-                    {type.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Leaderboard Table */}
@@ -189,21 +140,6 @@ export default function LeaderboardPage() {
         )}
       </div>
 
-      {/* Stats Section */}
-      <div className="mt-8 grid md:grid-cols-3 gap-6">
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-gray-900 mb-2">5</div>
-          <div className="text-sm text-gray-600">Active Models</div>
-        </div>
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-gray-900 mb-2">70</div>
-          <div className="text-sm text-gray-600">Total Votes</div>
-        </div>
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-gray-900 mb-2">6</div>
-          <div className="text-sm text-gray-600">Categories</div>
-        </div>
-      </div>
     </div>
   )
 } 

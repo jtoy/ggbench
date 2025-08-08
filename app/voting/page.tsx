@@ -138,7 +138,7 @@ export default function VotingPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8 mb-8">
+      <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 mb-8">
         {/* Animation A */}
         <div className="space-y-4">
           <div className="text-center">
@@ -150,7 +150,7 @@ export default function VotingPage() {
             )}
           </div>
           <div className="relative">
-            <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
+            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
                 key={`animationA-${refreshKeyA}`}
                 srcDoc={`
@@ -166,7 +166,7 @@ export default function VotingPage() {
                     </body>
                   </html>
                 `}
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 title="Animation A"
               />
             </div>
@@ -196,7 +196,7 @@ export default function VotingPage() {
             )}
           </div>
           <div className="relative">
-            <div className="w-[600px] h-[600px] bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
+            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
               <iframe
                 key={`animationB-${refreshKeyB}`}
                 srcDoc={`
@@ -212,7 +212,7 @@ export default function VotingPage() {
                     </body>
                   </html>
                 `}
-                className="w-full h-full"
+                className="absolute inset-0 w-full h-full"
                 title="Animation B"
               />
             </div>
@@ -233,7 +233,7 @@ export default function VotingPage() {
       </div>
 
       {/* Voting Buttons */}
-      <div className="flex justify-center space-x-4 mb-8">
+      <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-8">
         <button
           onClick={() => handleVote('A')}
           disabled={hasVoted}
@@ -269,7 +269,7 @@ export default function VotingPage() {
       {hasVoted && showModelNames && (
         <div className="text-center">
           <p className="text-gray-600">
-            Loading next comparison in 5 seconds...
+            Loading next comparison in 3 seconds...
           </p>
         </div>
       )}

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import pool, { OPENROUTER_API_KEY } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const P5JS_SCAFFOLDING_PROMPT = `
 Do not add any comments or text.
 Create animation that are not interactive.
@@ -222,7 +225,16 @@ export async function POST(request: NextRequest) {
         const prompt = promptResult.rows[0]
         
         // Generate code using the LLM
-        const generatedCode = await generateCodeWithLLM(model, prompt.text)
+        let generatedCode: string
+        try {
+          generatedCode = await generateCodeWithLLM(model, prompt.text)
+        } catch (e) {
+          const message = e instanceof Error ? e.message : 'Failed to generate animation'
+          return NextResponse.json(
+            { error: message },
+            { status: 502 }
+          )
+        }
         
         // Check if animation already exists for this model_id and prompt_id combination
         const existingAnimation = await client.query(
@@ -255,7 +267,7 @@ export async function POST(request: NextRequest) {
     } finally {
       client.release()
     }
-  } catch (error) {
+    } catch (error) {
     console.error('Error generating animation:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -349,10 +361,11 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
       // Otherwise loop and try once more
     } catch (error) {
       console.error('Error calling LLM API:', error)
-      // Only break out to fallback if this was an API failure on both attempts
+      // On API failure after final attempt, propagate error so caller can handle and avoid saving fallback
       if (attempt === 1) {
-        return FALLBACK_P5_CODE
+        throw (error instanceof Error ? error : new Error('LLM API request failed'))
       }
+      // otherwise continue to retry
     }
   }
 

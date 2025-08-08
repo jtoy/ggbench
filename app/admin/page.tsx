@@ -32,6 +32,7 @@ export default function AdminPanel() {
   const [isOverwritingAll, setIsOverwritingAll] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
 
   // Edit states for selected model/prompt
   const [editModel, setEditModel] = useState({
@@ -261,9 +262,15 @@ export default function AdminPanel() {
     }
   }
 
+  const showToast = (message: string, type: 'success' | 'error' = 'error') => {
+    setToast({ message, type })
+    window.clearTimeout((showToast as any)._tid)
+    ;(showToast as any)._tid = window.setTimeout(() => setToast(null), 4000)
+  }
+
   const generateAnimation = async () => {
     if (!selectedModel || !selectedPrompt) {
-      alert('Please select both a model and a prompt')
+      showToast('Please select both a model and a prompt', 'error')
       return
     }
 
@@ -282,9 +289,15 @@ export default function AdminPanel() {
       if (response.ok) {
         const data = await response.json()
         setGeneratedCode(data.code)
+        showToast('Animation generated successfully', 'success')
+      } else {
+        const err = await response.json().catch(() => ({}))
+        const msg = err?.error || 'Failed to generate animation'
+        showToast(msg, 'error')
       }
     } catch (error) {
       console.error('Error generating animation:', error)
+      showToast('Error generating animation', 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -394,8 +407,40 @@ export default function AdminPanel() {
     )
   }
 
+  const handleDeleteModel = async (model: Model) => {
+    const confirmed = window.confirm(
+      `Delete model "${model.name}" and all its animations and votes? This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`/api/admin/models?id=${model.id}` , {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (res.ok) {
+        await fetchModels()
+        if (selectedModel === model.id) {
+          setSelectedModel('')
+        }
+        alert('Model deleted')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(`Failed to delete model${err?.error ? `: ${err.error}` : ''}`)
+      }
+    } catch (e) {
+      console.error('Error deleting model:', e)
+      alert('Error deleting model')
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded shadow text-sm ${toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+          {toast.message}
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
         <p className="text-gray-600">Manage models, prompts, and generate animations</p>
@@ -720,6 +765,7 @@ export default function AdminPanel() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Endpoint</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ELO Score</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
                          <tbody className="bg-white divide-y divide-gray-200">
@@ -747,7 +793,16 @@ export default function AdminPanel() {
                      }`}>
                        {model.enabled ? 'Active' : 'Disabled'}
                      </span>
-                   </td>
+                 </td>
+                 <td className="px-6 py-4 whitespace-nowrap text-right">
+                   <button
+                     onClick={() => handleDeleteModel(model)}
+                     className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
+                     title="Delete model"
+                   >
+                     <Trash2 className="w-4 h-4" /> Delete
+                   </button>
+                 </td>
                  </tr>
                ))}
              </tbody>
