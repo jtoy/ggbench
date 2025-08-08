@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { getJson, setJson, isRedisEnabled } from '@/lib/redis'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -8,6 +9,15 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'all'
+    const cacheKey = `leaderboard:type:${type}`
+
+    // Try Redis cache first
+    if (isRedisEnabled()) {
+      const cached = await getJson<any[]>(cacheKey)
+      if (cached) {
+        return NextResponse.json(cached)
+      }
+    }
     
     const client = await pool.connect()
     try {
@@ -50,7 +60,12 @@ export async function GET(request: NextRequest) {
       `
       
       const result = await client.query(query, type !== 'all' ? [type] : [])
-      
+
+      // Store in Redis cache for 1 hour
+      if (isRedisEnabled()) {
+        await setJson(cacheKey, result.rows, 60 * 60)
+      }
+
       return NextResponse.json(result.rows)
     } finally {
       client.release()

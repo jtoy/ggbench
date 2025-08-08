@@ -16,6 +16,7 @@
     "clsx": "^2.0.0",
     "cookies-next": "^4.1.1",
     "dotenv": "^17.2.1",
+    "ioredis": "5.7.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.292.0",
     "next": "14.2.31",
