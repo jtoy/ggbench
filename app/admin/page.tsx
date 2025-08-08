@@ -8,6 +8,8 @@ interface Model {
   name: string
   api_type: string
   api_endpoint?: string
+  temperature: number | null
+  max_tokens: number | null
   elo_score: number
   enabled: boolean
 }
@@ -28,6 +30,22 @@ export default function AdminPanel() {
   const [isGeneratingForAll, setIsGeneratingForAll] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Edit states for selected model/prompt
+  const [editModel, setEditModel] = useState({
+    id: 0,
+    name: '',
+    api_type: '',
+    api_endpoint: '',
+    temperature: '',
+    max_tokens: '',
+    enabled: true,
+  })
+  const [editPrompt, setEditPrompt] = useState({
+    id: 0,
+    text: '',
+    tags: '',
+  })
 
   // Form states for adding new model
   const [newModel, setNewModel] = useState({
@@ -138,6 +156,106 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Error adding prompt:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedModel) {
+      const model = models.find((m) => m.id === selectedModel)
+      if (model) {
+        setEditModel({
+          id: model.id,
+          name: model.name || '',
+          api_type: model.api_type || '',
+          api_endpoint: model.api_endpoint || '',
+          temperature: model.temperature == null ? '' : String(model.temperature),
+          max_tokens: model.max_tokens == null ? '' : String(model.max_tokens),
+          enabled: model.enabled,
+        })
+      }
+    } else {
+      setEditModel({
+        id: 0,
+        name: '',
+        api_type: '',
+        api_endpoint: '',
+        temperature: '',
+        max_tokens: '',
+        enabled: true,
+      })
+    }
+  }, [selectedModel, models])
+
+  const saveEditedModel = async () => {
+    if (!editModel.id) return
+    try {
+      const response = await fetch('/api/admin/models', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: editModel.id,
+          name: editModel.name,
+          api_type: editModel.api_type,
+          api_endpoint: editModel.api_endpoint,
+          temperature: editModel.temperature === '' ? null : Number(editModel.temperature),
+          max_tokens: editModel.max_tokens === '' ? null : Number(editModel.max_tokens),
+          enabled: !!editModel.enabled,
+        }),
+      })
+      if (response.ok) {
+        await fetchModels()
+        alert('Model updated')
+      } else {
+        const err = await response.json().catch(() => ({}))
+        alert(`Failed to update model${err?.error ? `: ${err.error}` : ''}`)
+      }
+    } catch (e) {
+      console.error('Error updating model:', e)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedPrompt) {
+      const prompt = prompts.find((p) => p.id === selectedPrompt)
+      if (prompt) {
+        setEditPrompt({
+          id: prompt.id,
+          text: prompt.text || '',
+          tags: Array.isArray(prompt.tags) ? prompt.tags.join(', ') : '',
+        })
+      }
+    } else {
+      setEditPrompt({ id: 0, text: '', tags: '' })
+    }
+  }, [selectedPrompt, prompts])
+
+  const saveEditedPrompt = async () => {
+    if (!editPrompt.id) return
+    try {
+      const tagsArray = editPrompt.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t)
+      const response = await fetch('/api/admin/prompts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: editPrompt.id,
+          text: editPrompt.text,
+          tags: tagsArray,
+        }),
+      })
+      if (response.ok) {
+        await fetchPrompts()
+        alert('Prompt updated')
+      } else {
+        const err = await response.json().catch(() => ({}))
+        alert(`Failed to update prompt${err?.error ? `: ${err.error}` : ''}`)
+      }
+    } catch (e) {
+      console.error('Error updating prompt:', e)
     }
   }
 
@@ -374,6 +492,7 @@ export default function AdminPanel() {
                  </option>
                ))}
              </select>
+            {/* Auto-populated from DB on selection */}
           </div>
           
           <div>
@@ -392,6 +511,120 @@ export default function AdminPanel() {
                  </option>
                ))}
              </select>
+            {/* Auto-populated from DB on selection */}
+          </div>
+        </div>
+
+        {/* Edit Model */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900">Edit Model</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                value={editModel.name}
+                onChange={(e) => setEditModel({ ...editModel, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Model name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">API Type</label>
+              <select
+                value={editModel.api_type}
+                onChange={(e) => setEditModel({ ...editModel, api_type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Select API Type</option>
+                <option value="OpenAI">OpenAI</option>
+                <option value="Anthropic">Anthropic</option>
+                <option value="Google">Google</option>
+                <option value="OpenRouter">OpenRouter</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">API Endpoint</label>
+              <input
+                type="text"
+                value={editModel.api_endpoint}
+                onChange={(e) => setEditModel({ ...editModel, api_endpoint: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="https://..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editModel.temperature}
+                  onChange={(e) => setEditModel({ ...editModel, temperature: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Max Tokens</label>
+                <input
+                  type="number"
+                  value={editModel.max_tokens}
+                  onChange={(e) => setEditModel({ ...editModel, max_tokens: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="model-enabled"
+                type="checkbox"
+                checked={!!editModel.enabled}
+                onChange={(e) => setEditModel({ ...editModel, enabled: e.target.checked })}
+              />
+              <label htmlFor="model-enabled" className="text-sm text-gray-700">Enabled</label>
+            </div>
+            <div>
+              <button
+                onClick={saveEditedModel}
+                disabled={!editModel.id}
+                className="btn-primary"
+              >
+                Save Model Changes
+              </button>
+            </div>
+          </div>
+
+          {/* Edit Prompt */}
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900">Edit Prompt</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Text</label>
+              <textarea
+                value={editPrompt.text}
+                onChange={(e) => setEditPrompt({ ...editPrompt, text: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                rows={4}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
+              <input
+                type="text"
+                value={editPrompt.tags}
+                onChange={(e) => setEditPrompt({ ...editPrompt, tags: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <button
+                onClick={saveEditedPrompt}
+                disabled={!editPrompt.id}
+                className="btn-primary"
+              >
+                Save Prompt Changes
+              </button>
+            </div>
           </div>
         </div>
         

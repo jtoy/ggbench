@@ -72,3 +72,74 @@ export async function POST(request: NextRequest) {
     )
   }
 } 
+
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+
+    if (!user || !user.is_admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Model id is required' },
+        { status: 400 }
+      )
+    }
+
+    // Build dynamic update set clauses for provided fields only
+    const allowedFields = ['name', 'api_type', 'api_endpoint', 'temperature', 'max_tokens', 'enabled'] as const
+    const setClauses: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
+
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        setClauses.push(`${field} = $${paramIndex++}`)
+        values.push(body[field])
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+
+    values.push(id)
+
+    const client = await pool.connect()
+    try {
+      const result = await client.query(
+        `UPDATE models SET ${setClauses.join(', ')} WHERE id = $${paramIndex} 
+         RETURNING id, name, api_type, api_endpoint, temperature, max_tokens, elo_score, enabled`,
+        values
+      )
+
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Model not found' },
+          { status: 404 }
+        )
+      }
+
+      return NextResponse.json(result.rows[0])
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error updating model:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
