@@ -104,7 +104,7 @@ export default function VotingPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading comparison...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading comparison...</p>
         </div>
       </div>
     )
@@ -114,10 +114,10 @@ export default function VotingPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4 dark:text-gray-100">
             {error || 'No comparisons available'}
           </h1>
-          <p className="text-gray-600 mb-8">
+          <p className="text-gray-600 mb-8 dark:text-gray-300">
             Check back later for new comparisons or ask an admin to generate some animations.
           </p>
         </div>
@@ -128,11 +128,11 @@ export default function VotingPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+        <h1 className="text-3xl font-bold text-gray-900 mb-4 dark:text-gray-100">
           Which AI generated graphic is better?
         </h1>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
-          <p className="text-lg text-blue-900 font-medium">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto dark:bg-gray-800 dark:border-gray-700">
+          <p className="text-lg text-blue-900 font-medium dark:text-gray-100">
             "{currentComparison.prompt}"
           </p>
         </div>
@@ -142,7 +142,7 @@ export default function VotingPage() {
         {/* Animation A */}
         <div className="space-y-4">
           <div className="text-center">
-            <div className="text-sm text-gray-500">Option A</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Option A</div>
             {showModelNames && (
               <div className="text-lg font-semibold text-blue-600 mt-2">
                 Model: {currentComparison.animationA.model.name}
@@ -150,7 +150,7 @@ export default function VotingPage() {
             )}
           </div>
           <div className="relative">
-            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
+            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto dark:bg-gray-900 dark:border-gray-800">
               <iframe
                 key={`animationA-${refreshKeyA}`}
                 srcDoc={`
@@ -172,10 +172,10 @@ export default function VotingPage() {
             </div>
             <button
               onClick={refreshAnimationA}
-              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
+              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all dark:bg-gray-800 dark:text-gray-200"
               title="Refresh Animation A"
             >
-              <RotateCcw className="w-4 h-4 text-gray-700" />
+              <RotateCcw className="w-4 h-4 text-gray-700 dark:text-gray-200" />
             </button>
             {selectedVote === 'A' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -223,7 +223,7 @@ export default function VotingPage() {
         {/* Animation B */}
         <div className="space-y-4">
           <div className="text-center">
-            <div className="text-sm text-gray-500">Option B</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Option B</div>
             {showModelNames && (
               <div className="text-lg font-semibold text-blue-600 mt-2">
                 Model: {currentComparison.animationB.model.name}
@@ -231,7 +231,7 @@ export default function VotingPage() {
             )}
           </div>
           <div className="relative">
-            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto">
+            <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto dark:bg-gray-900 dark:border-gray-800">
               <iframe
                 key={`animationB-${refreshKeyB}`}
                 srcDoc={`
@@ -253,10 +253,10 @@ export default function VotingPage() {
             </div>
             <button
               onClick={refreshAnimationB}
-              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all"
+              className="absolute top-2 left-2 w-8 h-8 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-md transition-all dark:bg-gray-800 dark:text-gray-200"
               title="Refresh Animation B"
             >
-              <RotateCcw className="w-4 h-4 text-gray-700" />
+              <RotateCcw className="w-4 h-4 text-gray-700 dark:text-gray-200" />
             </button>
             {selectedVote === 'B' && (
               <div className="absolute top-2 right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -303,7 +303,7 @@ export default function VotingPage() {
       {/* Auto-advance message */}
       {hasVoted && showModelNames && (
         <div className="text-center">
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             Loading next comparison in 1 second...
           </p>
         </div>
