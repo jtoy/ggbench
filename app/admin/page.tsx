@@ -33,6 +33,8 @@ export default function AdminPanel() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [isAuthorized, setIsAuthorized] = useState(false)
 
   // Edit states for selected model/prompt
   const [editModel, setEditModel] = useState({
@@ -63,7 +65,29 @@ export default function AdminPanel() {
     tags: ''
   })
 
+  // Check authorization first
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          setIsAuthorized(!!data?.user?.is_admin)
+        } else {
+          setIsAuthorized(false)
+        }
+      } catch (_) {
+        setIsAuthorized(false)
+      } finally {
+        setAuthChecked(true)
+      }
+    }
+    checkAuth()
+  }, [])
+
+  // Load data only if authorized
+  useEffect(() => {
+    if (!authChecked || !isAuthorized) return
     const initializeData = async () => {
       setIsLoading(true)
       setError(null)
@@ -76,9 +100,8 @@ export default function AdminPanel() {
         setIsLoading(false)
       }
     }
-    
     initializeData()
-  }, [])
+  }, [authChecked, isAuthorized])
 
   const fetchModels = async () => {
     try {
@@ -384,13 +407,23 @@ export default function AdminPanel() {
     }
   }
 
-  if (isLoading) {
+  if (!authChecked || (isAuthorized && isLoading)) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading admin panel...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (authChecked && !isAuthorized) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Unauthorized</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-8">You don't have access to the admin panel.</p>
+        <a href="/" className="btn-primary inline-block">Go back home</a>
       </div>
     )
   }
