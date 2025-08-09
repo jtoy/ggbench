@@ -33,6 +33,8 @@ export default function AdminPanel() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [isAuthorized, setIsAuthorized] = useState(false)
 
   // Edit states for selected model/prompt
   const [editModel, setEditModel] = useState({
@@ -63,7 +65,29 @@ export default function AdminPanel() {
     tags: ''
   })
 
+  // Check authorization first
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          setIsAuthorized(!!data?.user?.is_admin)
+        } else {
+          setIsAuthorized(false)
+        }
+      } catch (_) {
+        setIsAuthorized(false)
+      } finally {
+        setAuthChecked(true)
+      }
+    }
+    checkAuth()
+  }, [])
+
+  // Load data only if authorized
+  useEffect(() => {
+    if (!authChecked || !isAuthorized) return
     const initializeData = async () => {
       setIsLoading(true)
       setError(null)
@@ -76,9 +100,8 @@ export default function AdminPanel() {
         setIsLoading(false)
       }
     }
-    
     initializeData()
-  }, [])
+  }, [authChecked, isAuthorized])
 
   const fetchModels = async () => {
     try {
@@ -384,13 +407,23 @@ export default function AdminPanel() {
     }
   }
 
-  if (isLoading) {
+  if (!authChecked || (isAuthorized && isLoading)) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading admin panel...</p>
         </div>
+      </div>
+    )
+  }
+
+  if (authChecked && !isAuthorized) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">Unauthorized</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-8">You don't have access to the admin panel.</p>
+        <a href="/" className="btn-primary inline-block">Go back home</a>
       </div>
     )
   }
@@ -442,39 +475,39 @@ export default function AdminPanel() {
         </div>
       )}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-        <p className="text-gray-600">Manage models, prompts, and generate animations</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">Admin Panel</h1>
+        <p className="text-gray-600 dark:text-gray-300">Manage models, prompts, and generate animations</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Add Model Form */}
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center dark:text-gray-100">
             <Plus className="w-5 h-5 mr-2" />
             Add New Model
           </h2>
           <form onSubmit={handleAddModel} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 Model Name
               </label>
               <input
                 type="text"
                 value={newModel.name}
                 onChange={(e) => setNewModel({ ...newModel, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 required
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 API Type
               </label>
               <select
                 value={newModel.api_type}
                 onChange={(e) => setNewModel({ ...newModel, api_type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 required
               >
                 <option value="">Select API Type</option>
@@ -487,14 +520,14 @@ export default function AdminPanel() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 API Endpoint
               </label>
               <input
                 type="text"
                 value={newModel.api_endpoint}
                 onChange={(e) => setNewModel({ ...newModel, api_endpoint: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 placeholder="https://api.openai.com/v1/chat/completions"
               />
             </div>
@@ -511,19 +544,19 @@ export default function AdminPanel() {
 
         {/* Add Prompt Form */}
         <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center dark:text-gray-100">
             <Plus className="w-5 h-5 mr-2" />
             Add New Prompt
           </h2>
           <form onSubmit={handleAddPrompt} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 Prompt Text
               </label>
               <textarea
                 value={newPrompt.text}
                 onChange={(e) => setNewPrompt({ ...newPrompt, text: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 rows={4}
                 placeholder="Describe the animation you want to generate..."
                 required
@@ -531,14 +564,14 @@ export default function AdminPanel() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 Tags (comma-separated)
               </label>
               <input
                 type="text"
                 value={newPrompt.tags}
                 onChange={(e) => setNewPrompt({ ...newPrompt, tags: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 placeholder="cityscape, futuristic, neon"
               />
             </div>
@@ -556,20 +589,20 @@ export default function AdminPanel() {
 
       {/* Generation Console */}
       <div className="card mt-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center dark:text-gray-100">
           <Settings className="w-5 h-5 mr-2" />
           Animation Generation Console
         </h2>
         
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
               Select Model
             </label>
                          <select
                value={selectedModel}
                onChange={(e) => setSelectedModel(e.target.value ? parseInt(e.target.value) : '')}
-               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+               className="w-full px-3 py-2"
              >
                <option value="">Choose a model</option>
                {Array.isArray(models) && models.map((model) => (
@@ -582,13 +615,13 @@ export default function AdminPanel() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
               Select Prompt
             </label>
                          <select
                value={selectedPrompt}
                onChange={(e) => setSelectedPrompt(e.target.value ? parseInt(e.target.value) : '')}
-               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+               className="w-full px-3 py-2"
              >
                <option value="">Choose a prompt</option>
                {Array.isArray(prompts) && prompts.map((prompt) => (
@@ -604,23 +637,23 @@ export default function AdminPanel() {
         {/* Edit Model */}
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-gray-900">Edit Model</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Model</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Name</label>
               <input
                 type="text"
                 value={editModel.name}
                 onChange={(e) => setEditModel({ ...editModel, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 placeholder="Model name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">API Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">API Type</label>
               <select
                 value={editModel.api_type}
                 onChange={(e) => setEditModel({ ...editModel, api_type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
               >
                 <option value="">Select API Type</option>
                 <option value="OpenAI">OpenAI</option>
@@ -631,33 +664,33 @@ export default function AdminPanel() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">API Endpoint</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">API Endpoint</label>
               <input
                 type="text"
                 value={editModel.api_endpoint}
                 onChange={(e) => setEditModel({ ...editModel, api_endpoint: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 placeholder="https://..."
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Temperature</label>
                 <input
                   type="number"
                   step="0.01"
                   value={editModel.temperature}
                   onChange={(e) => setEditModel({ ...editModel, temperature: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max Tokens</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Max Tokens</label>
                 <input
                   type="number"
                   value={editModel.max_tokens}
                   onChange={(e) => setEditModel({ ...editModel, max_tokens: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2"
                 />
               </div>
             </div>
@@ -668,7 +701,7 @@ export default function AdminPanel() {
                 checked={!!editModel.enabled}
                 onChange={(e) => setEditModel({ ...editModel, enabled: e.target.checked })}
               />
-              <label htmlFor="model-enabled" className="text-sm text-gray-700">Enabled</label>
+              <label htmlFor="model-enabled" className="text-sm text-gray-700 dark:text-gray-300">Enabled</label>
             </div>
             <div>
               <button
@@ -683,23 +716,23 @@ export default function AdminPanel() {
 
           {/* Edit Prompt */}
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-gray-900">Edit Prompt</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Prompt</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Text</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Text</label>
               <textarea
                 value={editPrompt.text}
                 onChange={(e) => setEditPrompt({ ...editPrompt, text: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
                 rows={4}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Tags (comma-separated)</label>
               <input
                 type="text"
                 value={editPrompt.tags}
                 onChange={(e) => setEditPrompt({ ...editPrompt, tags: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2"
               />
             </div>
             <div>
@@ -714,7 +747,7 @@ export default function AdminPanel() {
           </div>
         </div>
         
-        <div className="flex justify-start items-center gap-3 flex-wrap mb-6">
+        <div className="flex justify-start items-center gap-4 flex-wrap mt-4 sm:mt-6 mb-8">
           <button
             onClick={generateAnimation}
             disabled={isGenerating || isGeneratingForAll || !selectedModel || !selectedPrompt}
@@ -745,7 +778,7 @@ export default function AdminPanel() {
         
         {generatedCode && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generated Code</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 dark:text-gray-100">Generated Code</h3>
             <div className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto">
               <pre className="text-sm">{generatedCode}</pre>
             </div>
@@ -755,54 +788,54 @@ export default function AdminPanel() {
 
       {/* Models List */}
       <div className="card mt-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Current Models</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4 dark:text-gray-100">Current Models</h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+            <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Endpoint</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ELO Score</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">API Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">API Endpoint</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">ELO Score</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Actions</th>
               </tr>
             </thead>
-                         <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-800">
                {Array.isArray(models) && models.map((model) => (
                  <tr key={model.id}>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                     <Link className="text-primary-600 hover:underline" href={`/admin/model_gallery/${model.id}`}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <Link className="text-primary-600 hover:underline" href={`/admin/model_gallery/${model.id}`}>
                        {model.name}
                      </Link>
                    </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                      {model.api_type}
                    </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                      {model.api_endpoint || '-'}
                    </td>
-                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                      {model.enabled ? model.elo_score || 1000 : 'Disabled'}
                    </td>
                    <td className="px-6 py-4 whitespace-nowrap">
                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                        model.enabled 
-                         ? 'bg-green-100 text-green-800' 
-                         : 'bg-red-100 text-red-800'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                      }`}>
                        {model.enabled ? 'Active' : 'Disabled'}
                      </span>
                  </td>
-                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                   <button
-                     onClick={() => handleDeleteModel(model)}
-                     className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
-                     title="Delete model"
-                   >
-                     <Trash2 className="w-4 h-4" /> Delete
-                   </button>
-                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <button
+                    onClick={() => handleDeleteModel(model)}
+                    className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    title="Delete model"
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </button>
+                </td>
                  </tr>
                ))}
              </tbody>
