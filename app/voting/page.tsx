@@ -75,12 +75,12 @@ export default function VotingPage() {
       console.error('Error submitting vote:', error)
     }
 
-    // Show model names for 3 seconds after voting
+    // Show model names for 1 second after voting
     setShowModelNames(true)
     setTimeout(() => {
       setShowModelNames(false)
       handleNext()
-    }, 3000)
+    }, 1000)
   }
 
   const handleNext = () => {
@@ -269,7 +269,7 @@ export default function VotingPage() {
       {hasVoted && showModelNames && (
         <div className="text-center">
           <p className="text-gray-600">
-            Loading next comparison in 3 seconds...
+            Loading next comparison in 1 second...
           </p>
         </div>
       )}
