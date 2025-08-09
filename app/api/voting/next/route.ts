@@ -11,20 +11,7 @@ export async function GET() {
     try {
       // Get a random pair of animations that haven't been compared yet
       const result = await client.query(`
-        WITH model_vote_counts AS (
-          SELECT model_id, COUNT(*) AS vote_count
-          FROM (
-            SELECT a.model_id
-            FROM votes v
-            JOIN animations a ON a.id = v.animation_a_id
-            UNION ALL
-            SELECT b.model_id
-            FROM votes v
-            JOIN animations b ON b.id = v.animation_b_id
-          ) t
-          GROUP BY model_id
-        ),
-        animation_pairs AS (
+        WITH animation_pairs AS (
           SELECT 
             a1.id as animation_a_id,
             a2.id as animation_b_id,
@@ -34,16 +21,12 @@ export async function GET() {
             m1.name as model_a_name,
             m2.name as model_b_name,
             m1.id as model_a_id,
-            m2.id as model_b_id,
-            COALESCE(mc1.vote_count, 0) AS model_a_votes,
-            COALESCE(mc2.vote_count, 0) AS model_b_votes
+            m2.id as model_b_id
           FROM animations a1
           CROSS JOIN animations a2
           JOIN prompts p ON a1.prompt_id = p.id
           JOIN models m1 ON a1.model_id = m1.id
           JOIN models m2 ON a2.model_id = m2.id
-          LEFT JOIN model_vote_counts mc1 ON mc1.model_id = m1.id
-          LEFT JOIN model_vote_counts mc2 ON mc2.model_id = m2.id
           WHERE a1.id < a2.id
           AND a1.prompt_id = a2.prompt_id
           AND m1.enabled = true
@@ -55,7 +38,7 @@ export async function GET() {
           )
         )
         SELECT * FROM animation_pairs
-        ORDER BY (model_a_votes + model_b_votes) ASC, RANDOM()
+        ORDER BY RANDOM()
         LIMIT 1
       `)
       
