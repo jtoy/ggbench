@@ -10,6 +10,26 @@ export default function AboutPage() {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           A platform for comparing AI-generated graphics through community voting and ELO-based rankings.
         </p>
+        <p className="text-sm text-gray-500 mt-4">
+          Created by{' '}
+          <a
+            href="https://github.com/jtoy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-600 hover:underline"
+          >
+            Jason Toy
+          </a>{' '}
+          and{' '}
+          <a
+            href="http://github.com/dylanler"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary-600 hover:underline"
+          >
+            Dylan Ler
+          </a>
+        </p>
       </div>
 
       {/* Mission Section */}
