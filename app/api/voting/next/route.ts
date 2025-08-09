@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import pool from '@/lib/db'
+import { getJson, setJson } from '@/lib/redis'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -50,27 +51,53 @@ export async function GET() {
       }
       
       const row = result.rows[0]
-      
-      return NextResponse.json({
-        id: `${row.animation_a_id}-${row.animation_b_id}`,
-        prompt: row.prompt,
-        animationA: {
+
+      // Try to load animation details from Redis cache; if missing, use DB row and backfill cache
+      const keyA = `animation:${row.animation_a_id}`
+      const keyB = `animation:${row.animation_b_id}`
+      type AnimationCache = {
+        id: number
+        code: string
+        model: { id: number; name: string }
+      }
+
+      const [cachedA, cachedB] = await Promise.all([
+        getJson<AnimationCache>(keyA),
+        getJson<AnimationCache>(keyB),
+      ])
+
+      const animationA: AnimationCache =
+        cachedA ?? {
           id: row.animation_a_id,
           code: row.code_a,
-          model: {
-            id: row.model_a_id,
-            name: row.model_a_name
-          }
-        },
-        animationB: {
+          model: { id: row.model_a_id, name: row.model_a_name },
+        }
+
+      const animationB: AnimationCache =
+        cachedB ?? {
           id: row.animation_b_id,
           code: row.code_b,
-          model: {
-            id: row.model_b_id,
-            name: row.model_b_name
-          }
+          model: { id: row.model_b_id, name: row.model_b_name },
         }
-      }, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } })
+
+      // Cache miss backfill with 30-day TTL
+      const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30
+      const setOps: Promise<void>[] = []
+      if (!cachedA) setOps.push(setJson(keyA, animationA, THIRTY_DAYS_SECONDS))
+      if (!cachedB) setOps.push(setJson(keyB, animationB, THIRTY_DAYS_SECONDS))
+      if (setOps.length) {
+        await Promise.all(setOps)
+      }
+
+      return NextResponse.json(
+        {
+          id: `${row.animation_a_id}-${row.animation_b_id}`,
+          prompt: row.prompt,
+          animationA,
+          animationB,
+        },
+        { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } },
+      )
     } finally {
       client.release()
     }
