@@ -129,7 +129,7 @@ export default function VotingPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
-          Which AI generated graphic is better?
+          Which AI generated graphic animation is better?
         </h1>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
           <p className="text-lg text-blue-900 font-medium">
