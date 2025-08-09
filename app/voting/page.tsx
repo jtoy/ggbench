@@ -185,6 +185,41 @@ export default function VotingPage() {
           </div>
         </div>
 
+        {/* Mobile Voting Buttons (between A and B) */}
+        <div className="block lg:hidden">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+            <button
+              onClick={() => handleVote('A')}
+              disabled={hasVoted}
+              className={`flex items-center justify-center space-x-2 px-8 py-3 rounded-lg font-medium transition-colors ${
+                selectedVote === 'A'
+                  ? 'bg-green-500 text-white'
+                  : hasVoted
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              <span>Vote A</span>
+              {selectedVote === 'A' && <Check className="w-5 h-5" />}
+            </button>
+
+            <button
+              onClick={() => handleVote('B')}
+              disabled={hasVoted}
+              className={`flex items-center justify-center space-x-2 px-8 py-3 rounded-lg font-medium transition-colors ${
+                selectedVote === 'B'
+                  ? 'bg-green-500 text-white'
+                  : hasVoted
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              <span>Vote B</span>
+              {selectedVote === 'B' && <Check className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
         {/* Animation B */}
         <div className="space-y-4">
           <div className="text-center">
@@ -232,8 +267,8 @@ export default function VotingPage() {
         </div>
       </div>
 
-      {/* Voting Buttons */}
-      <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-8">
+      {/* Desktop Voting Buttons (bottom) */}
+      <div className="hidden lg:flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-8">
         <button
           onClick={() => handleVote('A')}
           disabled={hasVoted}
