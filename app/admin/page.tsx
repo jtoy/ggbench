@@ -477,6 +477,22 @@ export default function AdminPanel() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">Admin Panel</h1>
         <p className="text-gray-600 dark:text-gray-300">Manage models, prompts, and generate animations</p>
+        
+        {/* Navigation Links */}
+        <div className="mt-6 flex flex-wrap gap-4">
+          <Link
+            href="/admin/prompts"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Manage Prompts
+          </Link>
+          <Link
+            href="/admin/model_gallery"
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Model Gallery
+          </Link>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">

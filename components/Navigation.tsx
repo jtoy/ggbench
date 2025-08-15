@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Trophy, Vote, Info, User, LogIn, Settings, Moon, Sun } from 'lucide-react'
+import { Trophy, Vote, Info, User, LogIn, Settings, Moon, Sun, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 export default function Navigation() {
@@ -64,6 +64,7 @@ export default function Navigation() {
   const navItems = [
     { href: '/voting', label: 'Voting', icon: Vote },
     { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+    { href: '/submit-prompt', label: 'Submit a Prompt', icon: Plus },
     { href: '/about', label: 'About', icon: Info },
   ]
 

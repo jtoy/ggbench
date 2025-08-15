@@ -22,11 +22,15 @@ CREATE TABLE models (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Create status enum for prompts
+CREATE TYPE prompt_status AS ENUM ('active', 'inactive', 'draft', 'archived');
+
 -- Prompts table
 CREATE TABLE prompts (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL UNIQUE,
     tags TEXT[] NOT NULL,
+    status prompt_status NOT NULL DEFAULT 'active',
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

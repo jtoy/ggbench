@@ -19,9 +19,9 @@ export async function GET(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        'SELECT id, text, tags FROM prompts ORDER BY created_at DESC'
+        'SELECT id, text, tags, status, created_at FROM prompts ORDER BY created_at DESC'
       )
-      return NextResponse.json(result.rows)
+      return NextResponse.json({ prompts: result.rows })
     } finally {
       client.release()
     }
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { text, tags } = await request.json()
+    const { text, tags, status = 'active' } = await request.json()
     
     if (!text) {
       return NextResponse.json(
@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        'INSERT INTO prompts (text, tags) VALUES ($1, $2) RETURNING id, text, tags',
-        [text, tags || []]
+        'INSERT INTO prompts (text, tags, status) VALUES ($1, $2, $3) RETURNING id, text, tags, status, created_at',
+        [text, tags || [], status]
       )
       
       return NextResponse.json(result.rows[0])
@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest) {
       )
     }
     
-    const { id, text, tags } = await request.json()
+    const { id, text, tags, status } = await request.json()
     
     if (!id) {
       return NextResponse.json(
@@ -106,6 +106,10 @@ export async function PUT(request: NextRequest) {
       updates.push(`tags = $${paramIndex++}`)
       values.push(tags)
     }
+    if (status !== undefined) {
+      updates.push(`status = $${paramIndex++}`)
+      values.push(status)
+    }
     
     if (updates.length === 0) {
       return NextResponse.json(
@@ -119,7 +123,7 @@ export async function PUT(request: NextRequest) {
     const client = await pool.connect()
     try {
       const result = await client.query(
-        `UPDATE prompts SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, text, tags`,
+        `UPDATE prompts SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, text, tags, status, created_at`,
         values
       )
       
