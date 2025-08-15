@@ -108,7 +108,5 @@ ggbench/
 
 
 # contacts
-andrej
 claude jack
-david ha
 simonwillson
