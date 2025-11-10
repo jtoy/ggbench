@@ -5,6 +5,8 @@ import pool, { OPENROUTER_API_KEY } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+type Framework = 'threejs' | 'p5js' | 'svg'
+
 const P5JS_SCAFFOLDING_PROMPT = `
 Do not add any comments or text.
 Create animation that are not interactive.
@@ -19,6 +21,45 @@ Make sure to use proper p5.js syntax and functions.
 
 Animation description: `;
 
+const THREEJS_SCAFFOLDING_PROMPT = `
+Do not add any comments or text.
+Create animation that are not interactive.
+Generate ONLY JavaScript code for Three.js that can be embedded in a page that already has THREE loaded globally.
+Do NOT include <script> tags, HTML, or THREE.js library imports.
+The code should create a scene, camera, renderer, and animate objects.
+Use the global THREE object that's already available.
+The code should append the renderer to document.body and start animating immediately.
+Make sure to use proper Three.js syntax and functions.
+Output ONLY plain JavaScript code, no markdown formatting.
+
+Animation description: `;
+
+const SVG_SCAFFOLDING_PROMPT = `
+Do not add any comments or text.
+Create animation that are not interactive.
+Generate ONLY pure SVG markup with CSS animations.
+Do NOT include any JavaScript, <script> tags, requestAnimationFrame, or any JavaScript-based animation.
+Do NOT include <html>, <head>, <body> tags.
+Use ONLY SVG elements with CSS animations (using <animate>, <animateTransform>, <animateMotion>, or CSS @keyframes in <style> tags).
+The SVG should be a complete, self-contained element that can be embedded directly.
+Make sure the SVG is properly structured with width and height attributes.
+Output ONLY the SVG code with CSS animations, no markdown formatting, no JavaScript.
+
+Animation description: `;
+
+function getScaffoldingPrompt(framework: Framework): string {
+  switch (framework) {
+    case 'p5js':
+      return P5JS_SCAFFOLDING_PROMPT
+    case 'threejs':
+      return THREEJS_SCAFFOLDING_PROMPT
+    case 'svg':
+      return SVG_SCAFFOLDING_PROMPT
+    default:
+      return P5JS_SCAFFOLDING_PROMPT
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser(request)
@@ -30,11 +71,18 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { modelId, promptId, generateForAllPrompts, overwriteAllPrompts } = await request.json()
+    const { modelId, promptId, generateForAllPrompts, overwriteAllPrompts, framework = 'p5js' } = await request.json()
     
     if (!modelId) {
       return NextResponse.json(
         { error: 'Model ID is required' },
+        { status: 400 }
+      )
+    }
+    
+    if (!['threejs', 'p5js', 'svg'].includes(framework)) {
+      return NextResponse.json(
+        { error: 'Framework must be one of: threejs, p5js, svg' },
         { status: 400 }
       )
     }
@@ -87,11 +135,11 @@ export async function POST(request: NextRequest) {
           const batch = prompts.slice(i, i + batchSize)
           const batchPromises = batch.map(async (prompt) => {
             try {
-              const generatedCode = await generateCodeWithLLM(model, prompt.text)
-              // Upsert: update if exists else insert
+              const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
+              // Upsert: update if exists else insert (checking framework too)
               const existing = await client.query(
-                'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2',
-                [modelId, prompt.id]
+                'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
+                [modelId, prompt.id, framework]
               )
               let animationId
               if (existing.rows.length > 0) {
@@ -100,14 +148,14 @@ export async function POST(request: NextRequest) {
                   [generatedCode, existing.rows[0].id]
                 )
                 animationId = update.rows[0].id
-                console.log(`Overwrote animation ${animationId} for model ${modelId} prompt ${prompt.id}`)
+                console.log(`Overwrote animation ${animationId} for model ${modelId} prompt ${prompt.id} framework ${framework}`)
               } else {
                 const insert = await client.query(
-                  'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-                  [modelId, prompt.id, generatedCode]
+                  'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+                  [modelId, prompt.id, generatedCode, framework]
                 )
                 animationId = insert.rows[0].id
-                console.log(`Created animation ${animationId} for model ${modelId} prompt ${prompt.id}`)
+                console.log(`Created animation ${animationId} for model ${modelId} prompt ${prompt.id} framework ${framework}`)
               }
               return { promptId: prompt.id, animationId, success: true }
             } catch (error) {
@@ -130,15 +178,15 @@ export async function POST(request: NextRequest) {
           results
         })
       } else if (generateForAllPrompts) {
-        // Get all prompts that don't have animations for this model
+        // Get all prompts that don't have animations for this model and framework
         const promptsToGenerate = await client.query(
           `SELECT p.id, p.text 
            FROM prompts p 
            WHERE NOT EXISTS (
              SELECT 1 FROM animations a 
-             WHERE a.model_id = $1 AND a.prompt_id = p.id
+             WHERE a.model_id = $1 AND a.prompt_id = p.id AND a.framework = $2
            )`,
-          [modelId]
+          [modelId, framework]
         )
         
         if (promptsToGenerate.rows.length === 0) {
@@ -163,15 +211,15 @@ export async function POST(request: NextRequest) {
           const batchPromises = batch.map(async (prompt) => {
             try {
               // Generate code using the LLM
-              const generatedCode = await generateCodeWithLLM(model, prompt.text)
+              const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
               
               // Insert new animation
               const animationResult = await client.query(
-                'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-                [modelId, prompt.id, generatedCode]
+                'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+                [modelId, prompt.id, generatedCode, framework]
               )
               
-              console.log(`Created animation for model ${modelId} and prompt ${prompt.id}`)
+              console.log(`Created animation for model ${modelId} and prompt ${prompt.id} framework ${framework}`)
               
               return {
                 promptId: prompt.id,
@@ -227,7 +275,7 @@ export async function POST(request: NextRequest) {
         // Generate code using the LLM
         let generatedCode: string
         try {
-          generatedCode = await generateCodeWithLLM(model, prompt.text)
+          generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
         } catch (e) {
           const message = e instanceof Error ? e.message : 'Failed to generate animation'
           return NextResponse.json(
@@ -236,27 +284,27 @@ export async function POST(request: NextRequest) {
           )
         }
         
-        // Check if animation already exists for this model_id and prompt_id combination
+        // Check if animation already exists for this model_id, prompt_id, and framework combination
         const existingAnimation = await client.query(
-          'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2',
-          [modelId, promptId]
+          'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
+          [modelId, promptId, framework]
         )
 
         let animationResult
         if (existingAnimation.rows.length > 0) {
           // Update existing animation
           animationResult = await client.query(
-            'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 RETURNING id',
-            [generatedCode, modelId, promptId]
+            'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 AND framework = $4 RETURNING id',
+            [generatedCode, modelId, promptId, framework]
           )
-          console.log(`Updated existing animation for model ${modelId} and prompt ${promptId}`)
+          console.log(`Updated existing animation for model ${modelId} and prompt ${promptId} framework ${framework}`)
         } else {
           // Insert new animation
           animationResult = await client.query(
-            'INSERT INTO animations (model_id, prompt_id, code) VALUES ($1, $2, $3) RETURNING id',
-            [modelId, promptId, generatedCode]
+            'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+            [modelId, promptId, generatedCode, framework]
           )
-          console.log(`Created new animation for model ${modelId} and prompt ${promptId}`)
+          console.log(`Created new animation for model ${modelId} and prompt ${promptId} framework ${framework}`)
         }
         
         return NextResponse.json({
@@ -276,15 +324,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateCodeWithLLM(model: any, promptText: string): Promise<string> {
+async function generateCodeWithLLM(model: any, promptText: string, framework: Framework = 'p5js'): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     throw new Error('OPENROUTER_API_KEY is not configured')
   }
 
+  const scaffoldingPrompt = getScaffoldingPrompt(framework)
+  const frameworkName = framework === 'threejs' ? 'Three.js' : framework === 'svg' ? 'SVG' : 'p5.js'
+
   // Attempt up to 2 times: initial + 1 retry if syntax invalid
   for (let attempt = 0; attempt < 2; attempt++) {
-    const retrySuffix = attempt === 0 ? '' : `\n\nRegenerate. Previous output had a JavaScript syntax error when parsed.\nStrictly output ONLY plain p5.js code with no markdown fences, no imports/exports, and no comments.`
-    const fullPrompt = P5JS_SCAFFOLDING_PROMPT + promptText + retrySuffix
+    const retrySuffix = attempt === 0 ? '' : `\n\nRegenerate. Previous output had a syntax error when parsed.\nStrictly output ONLY plain ${frameworkName} code with no markdown fences, no imports/exports, and no comments.`
+    const fullPrompt = scaffoldingPrompt + promptText + retrySuffix
 
     try {
       const headers: Record<string, string> = {
@@ -353,9 +404,11 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
         generatedCode = generatedCode.split('```')[1] || generatedCode
       }
 
-      generatedCode = ensureSetupAndDraw(generatedCode)
+      if (framework === 'p5js') {
+        generatedCode = ensureSetupAndDraw(generatedCode)
+      }
 
-      if (isValidJavaScript(generatedCode)) {
+      if (isValidJavaScript(generatedCode) || framework === 'svg') {
         return generatedCode.trim()
       }
       // Otherwise loop and try once more
@@ -370,7 +423,13 @@ async function generateCodeWithLLM(model: any, promptText: string): Promise<stri
   }
 
   // If both attempts resulted in invalid JS, return a simple valid sketch
-  return FALLBACK_P5_CODE
+  if (framework === 'p5js') {
+    return FALLBACK_P5_CODE
+  } else if (framework === 'threejs') {
+    return FALLBACK_THREEJS_CODE
+  } else {
+    return FALLBACK_SVG_CODE
+  }
 } 
 
 function ensureSetupAndDraw(code: string): string {
@@ -401,3 +460,7 @@ function isValidJavaScript(code: string): boolean {
 }
 
 const FALLBACK_P5_CODE = `function setup() {\n  createCanvas(400, 400);\n}\n\nfunction draw() {\n  background(220);\n  textAlign(CENTER, CENTER);\n  textSize(16);\n  fill(0);\n  text(\"Animation generation failed\", width/2, height/2);\n}`
+
+const FALLBACK_THREEJS_CODE = `<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n<script>\nconst scene = new THREE.Scene();\nconst camera = new THREE.PerspectiveCamera(75, 400/400, 0.1, 1000);\nconst renderer = new THREE.WebGLRenderer();\nrenderer.setSize(400, 400);\ndocument.body.appendChild(renderer.domElement);\nconst geometry = new THREE.BoxGeometry();\nconst material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });\nconst cube = new THREE.Mesh(geometry, material);\nscene.add(cube);\ncamera.position.z = 5;\nfunction animate() {\n  requestAnimationFrame(animate);\n  cube.rotation.x += 0.01;\n  cube.rotation.y += 0.01;\n  renderer.render(scene, camera);\n}\nanimate();\n</script>`
+
+const FALLBACK_SVG_CODE = `<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">\n  <rect x="150" y="150" width="100" height="100" fill="red">\n    <animate attributeName="opacity" values="1;0.5;1" dur="1s" repeatCount="indefinite"/>\n  </rect>\n  <text x="200" y="220" text-anchor="middle" font-size="16" fill="white">Animation generation failed</text>\n</svg>`

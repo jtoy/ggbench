@@ -6,15 +6,16 @@ import { Trophy, TrendingUp, TrendingDown } from 'lucide-react'
 export default function LeaderboardPage() {
   const [leaderboardData, setLeaderboardData] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [framework, setFramework] = useState<'threejs' | 'p5js' | 'svg'>('p5js')
 
   useEffect(() => {
     fetchLeaderboard()
-  }, [])
+  }, [framework])
 
   const fetchLeaderboard = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/leaderboard`)
+      const response = await fetch(`/api/leaderboard?framework=${framework}`)
       if (response.ok) {
         const data = await response.json()
         setLeaderboardData(data)
@@ -66,9 +67,46 @@ export default function LeaderboardPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4 dark:text-gray-100">Leaderboard</h1>
-        <p className="text-gray-600 dark:text-gray-300">
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
           See how different AI models perform in generating graphics across various categories.
         </p>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Framework:
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFramework('p5js')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                framework === 'p5js'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              p5.js
+            </button>
+            <button
+              onClick={() => setFramework('threejs')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                framework === 'threejs'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Three.js
+            </button>
+            <button
+              onClick={() => setFramework('svg')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                framework === 'svg'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              SVG
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Leaderboard Table */}

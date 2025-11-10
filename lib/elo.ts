@@ -2,6 +2,8 @@ import pool from './db'
 
 const K_FACTOR = 32 // Standard K-factor for ELO calculations
 
+export type Framework = 'threejs' | 'p5js' | 'svg'
+
 export interface EloResult {
   newRatingA: number
   newRatingB: number
@@ -32,16 +34,25 @@ export function calculateElo(ratingA: number, ratingB: number, scoreA: number): 
 export async function updateModelRatings(animationAId: number, animationBId: number, winner: 'A' | 'B' | 'TIE') {
   const client = await pool.connect()
   try {
-    // Get the animations with their model ratings - fetch them separately to ensure correct mapping
+    // Get the animations with their model ratings and framework
     const animationAResult = await client.query(`
       SELECT 
         a.id as animation_id,
+        a.framework,
         m.id as model_id,
         m.name as model_name,
-        m.elo_score,
-        m.wins,
-        m.losses,
-        m.ties
+        m.elo_score_threejs,
+        m.elo_score_p5js,
+        m.elo_score_svg,
+        m.wins_threejs,
+        m.losses_threejs,
+        m.ties_threejs,
+        m.wins_p5js,
+        m.losses_p5js,
+        m.ties_p5js,
+        m.wins_svg,
+        m.losses_svg,
+        m.ties_svg
       FROM animations a
       JOIN models m ON a.model_id = m.id
       WHERE a.id = $1
@@ -50,12 +61,21 @@ export async function updateModelRatings(animationAId: number, animationBId: num
     const animationBResult = await client.query(`
       SELECT 
         a.id as animation_id,
+        a.framework,
         m.id as model_id,
         m.name as model_name,
-        m.elo_score,
-        m.wins,
-        m.losses,
-        m.ties
+        m.elo_score_threejs,
+        m.elo_score_p5js,
+        m.elo_score_svg,
+        m.wins_threejs,
+        m.losses_threejs,
+        m.ties_threejs,
+        m.wins_p5js,
+        m.losses_p5js,
+        m.ties_p5js,
+        m.wins_svg,
+        m.losses_svg,
+        m.ties_svg
       FROM animations a
       JOIN models m ON a.model_id = m.id
       WHERE a.id = $1
@@ -68,8 +88,28 @@ export async function updateModelRatings(animationAId: number, animationBId: num
     const modelA = animationAResult.rows[0]
     const modelB = animationBResult.rows[0]
     
-    console.log(`ELO Update: Animation A (${animationAId}) -> Model ${modelA.model_name} (${modelA.elo_score})`)
-    console.log(`ELO Update: Animation B (${animationBId}) -> Model ${modelB.model_name} (${modelB.elo_score})`)
+    // Ensure both animations have the same framework
+    if (modelA.framework !== modelB.framework) {
+      throw new Error(`Frameworks do not match: ${modelA.framework} vs ${modelB.framework}`)
+    }
+    
+    const framework = modelA.framework as Framework
+    
+    // Get framework-specific ELO scores
+    const eloColumnA = `elo_score_${framework}` as 'elo_score_threejs' | 'elo_score_p5js' | 'elo_score_svg'
+    const eloColumnB = `elo_score_${framework}` as 'elo_score_threejs' | 'elo_score_p5js' | 'elo_score_svg'
+    const winsColumnA = `wins_${framework}` as 'wins_threejs' | 'wins_p5js' | 'wins_svg'
+    const lossesColumnA = `losses_${framework}` as 'losses_threejs' | 'losses_p5js' | 'losses_svg'
+    const tiesColumnA = `ties_${framework}` as 'ties_threejs' | 'ties_p5js' | 'ties_svg'
+    const winsColumnB = `wins_${framework}` as 'wins_threejs' | 'wins_p5js' | 'wins_svg'
+    const lossesColumnB = `losses_${framework}` as 'losses_threejs' | 'losses_p5js' | 'losses_svg'
+    const tiesColumnB = `ties_${framework}` as 'ties_threejs' | 'ties_p5js' | 'ties_svg'
+    
+    const ratingA = modelA[eloColumnA]
+    const ratingB = modelB[eloColumnB]
+    
+    console.log(`ELO Update [${framework}]: Animation A (${animationAId}) -> Model ${modelA.model_name} (${ratingA})`)
+    console.log(`ELO Update [${framework}]: Animation B (${animationBId}) -> Model ${modelB.model_name} (${ratingB})`)
     console.log(`Winner: ${winner}`)
     
     // Determine the score based on winner
@@ -83,41 +123,42 @@ export async function updateModelRatings(animationAId: number, animationBId: num
     }
     
     // Calculate new ELO ratings
-    const eloResult = calculateElo(modelA.elo_score, modelB.elo_score, scoreA)
+    const eloResult = calculateElo(ratingA, ratingB, scoreA)
     
-    console.log(`ELO Calculation: ${modelA.elo_score} vs ${modelB.elo_score}, scoreA: ${scoreA}`)
-    console.log(`New ratings: ${modelA.model_name}: ${modelA.elo_score} -> ${eloResult.newRatingA}`)
-    console.log(`New ratings: ${modelB.model_name}: ${modelB.elo_score} -> ${eloResult.newRatingB}`)
+    console.log(`ELO Calculation [${framework}]: ${ratingA} vs ${ratingB}, scoreA: ${scoreA}`)
+    console.log(`New ratings: ${modelA.model_name}: ${ratingA} -> ${eloResult.newRatingA}`)
+    console.log(`New ratings: ${modelB.model_name}: ${ratingB} -> ${eloResult.newRatingB}`)
     
-    // Update model A
-    const newWinsA = modelA.wins + (winner === 'A' ? 1 : 0)
-    const newLossesA = modelA.losses + (winner === 'B' ? 1 : 0)
-    const newTiesA = modelA.ties + (winner === 'TIE' ? 1 : 0)
+    // Update model A with framework-specific stats
+    const newWinsA = modelA[winsColumnA] + (winner === 'A' ? 1 : 0)
+    const newLossesA = modelA[lossesColumnA] + (winner === 'B' ? 1 : 0)
+    const newTiesA = modelA[tiesColumnA] + (winner === 'TIE' ? 1 : 0)
     
     await client.query(`
       UPDATE models 
-      SET elo_score = $1, wins = $2, losses = $3, ties = $4
+      SET ${eloColumnA} = $1, ${winsColumnA} = $2, ${lossesColumnA} = $3, ${tiesColumnA} = $4
       WHERE id = $5
     `, [eloResult.newRatingA, newWinsA, newLossesA, newTiesA, modelA.model_id])
     
-    // Update model B
-    const newWinsB = modelB.wins + (winner === 'B' ? 1 : 0)
-    const newLossesB = modelB.losses + (winner === 'A' ? 1 : 0)
-    const newTiesB = modelB.ties + (winner === 'TIE' ? 1 : 0)
+    // Update model B with framework-specific stats
+    const newWinsB = modelB[winsColumnB] + (winner === 'B' ? 1 : 0)
+    const newLossesB = modelB[lossesColumnB] + (winner === 'A' ? 1 : 0)
+    const newTiesB = modelB[tiesColumnB] + (winner === 'TIE' ? 1 : 0)
     
     await client.query(`
       UPDATE models 
-      SET elo_score = $1, wins = $2, losses = $3, ties = $4
+      SET ${eloColumnB} = $1, ${winsColumnB} = $2, ${lossesColumnB} = $3, ${tiesColumnB} = $4
       WHERE id = $5
     `, [eloResult.newRatingB, newWinsB, newLossesB, newTiesB, modelB.model_id])
     
-    console.log(`Updated ${modelA.model_name}: ELO ${eloResult.newRatingA}, W:${newWinsA} L:${newLossesA} T:${newTiesA}`)
-    console.log(`Updated ${modelB.model_name}: ELO ${eloResult.newRatingB}, W:${newWinsB} L:${newLossesB} T:${newTiesB}`)
+    console.log(`Updated ${modelA.model_name} [${framework}]: ELO ${eloResult.newRatingA}, W:${newWinsA} L:${newLossesA} T:${newTiesA}`)
+    console.log(`Updated ${modelB.model_name} [${framework}]: ELO ${eloResult.newRatingB}, W:${newWinsB} L:${newLossesB} T:${newTiesB}`)
     
     return {
+      framework,
       modelA: {
         id: modelA.model_id,
-        oldRating: modelA.elo_score,
+        oldRating: ratingA,
         newRating: eloResult.newRatingA,
         wins: newWinsA,
         losses: newLossesA,
@@ -125,7 +166,7 @@ export async function updateModelRatings(animationAId: number, animationBId: num
       },
       modelB: {
         id: modelB.model_id,
-        oldRating: modelB.elo_score,
+        oldRating: ratingB,
         newRating: eloResult.newRatingB,
         wins: newWinsB,
         losses: newLossesB,

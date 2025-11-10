@@ -6,6 +6,7 @@ import { Check, X, ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react'
 interface Animation {
   id: number
   code: string
+  framework: string
   model: {
     id: number
     name: string
@@ -15,6 +16,7 @@ interface Animation {
 interface Comparison {
   id: number
   prompt: string
+  framework: string
   animationA: Animation
   animationB: Animation
 }
@@ -28,16 +30,17 @@ export default function VotingPage() {
   const [showModelNames, setShowModelNames] = useState(false)
   const [refreshKeyA, setRefreshKeyA] = useState(0)
   const [refreshKeyB, setRefreshKeyB] = useState(0)
+  const [framework, setFramework] = useState<'threejs' | 'p5js' | 'svg'>('p5js')
 
   useEffect(() => {
     fetchNextComparison()
-  }, [])
+  }, [framework])
 
   const fetchNextComparison = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/voting/next')
+      const response = await fetch(`/api/voting/next?framework=${framework}`)
       if (response.ok) {
         const data = await response.json()
         setCurrentComparison(data)
@@ -99,6 +102,57 @@ export default function VotingPage() {
     setRefreshKeyB(prev => prev + 1)
   }
 
+  const renderAnimationHTML = (code: string, framework: string): string => {
+    if (framework === 'p5js') {
+      return `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+          </head>
+          <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
+            <script>
+              ${code}
+            </script>
+          </body>
+        </html>
+      `
+    } else if (framework === 'threejs') {
+      return `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <style>
+              body { margin: 0; padding: 0; overflow: hidden; }
+            </style>
+          </head>
+          <body style="width:100vw;height:100vh;">
+            <script>
+              ${code}
+            </script>
+          </body>
+        </html>
+      `
+    } else if (framework === 'svg') {
+      return `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; }
+              svg { max-width: 100%; max-height: 100%; }
+            </style>
+          </head>
+          <body>
+            ${code}
+          </body>
+        </html>
+      `
+    }
+    return ''
+  }
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -131,6 +185,20 @@ export default function VotingPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-4 dark:text-gray-100">
           Which AI generated graphic is better?
         </h1>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Framework:
+          </label>
+          <select
+            value={framework}
+            onChange={(e) => setFramework(e.target.value as 'threejs' | 'p5js' | 'svg')}
+            className="px-4 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="p5js">p5.js</option>
+            <option value="threejs">Three.js</option>
+            <option value="svg">SVG</option>
+          </select>
+        </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto dark:bg-gray-800 dark:border-gray-700">
           <p className="text-lg text-blue-900 font-medium dark:text-gray-100">
             "{currentComparison.prompt}"
@@ -153,19 +221,7 @@ export default function VotingPage() {
             <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto dark:bg-gray-900 dark:border-gray-800">
               <iframe
                 key={`animationA-${refreshKeyA}`}
-                srcDoc={`
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-                    </head>
-                    <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
-                      <script>
-                        ${currentComparison.animationA.code}
-                      </script>
-                    </body>
-                  </html>
-                `}
+                srcDoc={renderAnimationHTML(currentComparison.animationA.code, currentComparison.framework)}
                 className="absolute inset-0 w-full h-full"
                 title="Animation A"
               />
@@ -234,19 +290,7 @@ export default function VotingPage() {
             <div className="relative w-full max-w-[600px] aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden mx-auto dark:bg-gray-900 dark:border-gray-800">
               <iframe
                 key={`animationB-${refreshKeyB}`}
-                srcDoc={`
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-                    </head>
-                    <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;width:100vw;height:100vh;">
-                      <script>
-                        ${currentComparison.animationB.code}
-                      </script>
-                    </body>
-                  </html>
-                `}
+                srcDoc={renderAnimationHTML(currentComparison.animationB.code, currentComparison.framework)}
                 className="absolute inset-0 w-full h-full"
                 title="Animation B"
               />

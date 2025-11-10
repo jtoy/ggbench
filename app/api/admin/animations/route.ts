@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
           a.model_id,
           a.prompt_id,
           a.code,
+          a.framework,
           a.created_at,
           p.text AS prompt_text,
           p.tags AS prompt_tags,

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 import { getJson, setJson } from '@/lib/redis'
 
@@ -6,11 +6,21 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const framework = searchParams.get('framework') || 'p5js'
+    
+    if (!['threejs', 'p5js', 'svg'].includes(framework)) {
+      return NextResponse.json(
+        { error: 'Invalid framework. Must be one of: threejs, p5js, svg' },
+        { status: 400 }
+      )
+    }
+    
     const client = await pool.connect()
     try {
-      // Get a random pair of animations that haven't been compared yet
+      // Get a random pair of animations that haven't been compared yet and have the same framework
       const result = await client.query(`
         WITH animation_pairs AS (
           SELECT 
@@ -19,6 +29,7 @@ export async function GET() {
             p.text as prompt,
             a1.code as code_a,
             a2.code as code_b,
+            a1.framework,
             m1.name as model_a_name,
             m2.name as model_b_name,
             m1.id as model_a_id,
@@ -30,6 +41,8 @@ export async function GET() {
           JOIN models m2 ON a2.model_id = m2.id
           WHERE a1.id < a2.id
           AND a1.prompt_id = a2.prompt_id
+          AND a1.framework = a2.framework
+          AND a1.framework = $1
           AND m1.enabled = true
           AND m2.enabled = true
           AND NOT EXISTS (
@@ -41,7 +54,7 @@ export async function GET() {
         SELECT * FROM animation_pairs
         ORDER BY RANDOM()
         LIMIT 1
-      `)
+      `, [framework])
       
       if (result.rows.length === 0) {
         return NextResponse.json(
@@ -58,6 +71,7 @@ export async function GET() {
       type AnimationCache = {
         id: number
         code: string
+        framework: string
         model: { id: number; name: string }
       }
 
@@ -70,6 +84,7 @@ export async function GET() {
         cachedA ?? {
           id: row.animation_a_id,
           code: row.code_a,
+          framework: row.framework,
           model: { id: row.model_a_id, name: row.model_a_name },
         }
 
@@ -77,6 +92,7 @@ export async function GET() {
         cachedB ?? {
           id: row.animation_b_id,
           code: row.code_b,
+          framework: row.framework,
           model: { id: row.model_b_id, name: row.model_b_name },
         }
 
@@ -93,6 +109,7 @@ export async function GET() {
         {
           id: `${row.animation_a_id}-${row.animation_b_id}`,
           prompt: row.prompt,
+          framework: framework,
           animationA,
           animationB,
         },

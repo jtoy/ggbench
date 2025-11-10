@@ -104,9 +104,13 @@ ggbench/
 ```
 
 # TODO
+dont show blank animations
+threejs
 
 
 
 # contacts
 claude jack
 simonwillson
+p5js peeps
+quinton

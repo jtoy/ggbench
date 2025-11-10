@@ -10,6 +10,7 @@ interface AnimationItem {
   model_id: number
   prompt_id: number
   code: string
+  framework: string
   created_at: string
   prompt_text: string
   prompt_tags: string[]
@@ -28,6 +29,7 @@ export default function ModelGalleryPage() {
   const [error, setError] = useState<string | null>(null)
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null)
   const [showCodeById, setShowCodeById] = useState<Record<number, boolean>>({})
+  const [frameworkFilter, setFrameworkFilter] = useState<string>('all')
 
   useEffect(() => {
     const run = async () => {
@@ -54,9 +56,23 @@ export default function ModelGalleryPage() {
 
   const modelName = useMemo(() => items?.[0]?.model_name || 'Model', [items])
 
+  const filteredItems = useMemo(() => {
+    if (frameworkFilter === 'all') return items
+    return items.filter(item => (item.framework || 'p5js') === frameworkFilter)
+  }, [items, frameworkFilter])
+
+  const frameworkCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: items.length }
+    items.forEach(item => {
+      const framework = item.framework || 'p5js'
+      counts[framework] = (counts[framework] || 0) + 1
+    })
+    return counts
+  }, [items])
+
   const handleRegenerate = async (item: AnimationItem) => {
     if (!modelId) return
-    const confirm = window.confirm('Regenerate this animation code for the same prompt? This will overwrite the existing code.')
+    const confirm = window.confirm(`Regenerate this ${item.framework || 'p5js'} animation code for the same prompt? This will overwrite the existing code.`)
     if (!confirm) return
 
     setRegeneratingId(item.id)
@@ -65,7 +81,11 @@ export default function ModelGalleryPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ modelId: Number(modelId), promptId: item.prompt_id })
+        body: JSON.stringify({ 
+          modelId: Number(modelId), 
+          promptId: item.prompt_id,
+          framework: item.framework || 'p5js'
+        })
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -110,11 +130,36 @@ export default function ModelGalleryPage() {
         <Link href="/admin" className="text-primary-600 hover:underline">Back to Admin</Link>
       </div>
 
+      {items.length > 0 && (
+        <div className="mb-6 flex items-center gap-4">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Filter by Framework:
+          </label>
+          <select
+            value={frameworkFilter}
+            onChange={(e) => setFrameworkFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All ({frameworkCounts.all})</option>
+            <option value="p5js">p5.js ({frameworkCounts.p5js || 0})</option>
+            <option value="threejs">Three.js ({frameworkCounts.threejs || 0})</option>
+            <option value="svg">SVG ({frameworkCounts.svg || 0})</option>
+          </select>
+          {frameworkFilter !== 'all' && (
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {filteredItems.length} of {items.length} animations
+            </span>
+          )}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <p className="text-gray-600">No animations yet for this model.</p>
+      ) : filteredItems.length === 0 ? (
+        <p className="text-gray-600">No animations found for the selected framework.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div key={item.id} className="relative border rounded-lg p-4 bg-white shadow-sm">
               <button
                 onClick={() => handleRegenerate(item)}
@@ -145,10 +190,13 @@ export default function ModelGalleryPage() {
                 )}
               </div>
 
-              <div className="text-xs text-gray-500 mb-3">
-                <span className="mr-3">Votes: {item.total_votes}</span>
-                <span className="mr-3">W {item.wins}</span>
-                <span className="mr-3">L {item.losses}</span>
+              <div className="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                  {item.framework || 'p5js'}
+                </span>
+                <span>Votes: {item.total_votes}</span>
+                <span>W {item.wins}</span>
+                <span>L {item.losses}</span>
                 <span>T {item.ties}</span>
               </div>
 
@@ -157,7 +205,7 @@ export default function ModelGalleryPage() {
                   <pre className="text-[10px] leading-snug text-green-400 p-3 overflow-auto max-h-64">{item.code}</pre>
                 </div>
               ) : (
-                <P5Preview code={item.code} width={400} height={400} />
+                <AnimationPreview code={item.code} framework={item.framework || 'p5js'} width={400} height={400} />
               )}
             </div>
           ))}
@@ -167,8 +215,10 @@ export default function ModelGalleryPage() {
   )
 }
 
-function P5Preview({ code, width = 400, height = 400 }: { code: string; width?: number; height?: number }) {
-  const html = `<!DOCTYPE html>
+function AnimationPreview({ code, framework = 'p5js', width = 400, height = 400 }: { code: string; framework?: string; width?: number; height?: number }) {
+  const getHTML = () => {
+    if (framework === 'p5js') {
+      return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -177,7 +227,6 @@ function P5Preview({ code, width = 400, height = 400 }: { code: string; width?: 
     html, body { margin: 0; padding: 0; overflow: hidden; background: #ffffff; }
     body, #container { width: 100vw; height: 100vh; }
     #container { position: relative; overflow: hidden; background: #ffffff; }
-    /* Force canvas to fill the iframe viewport regardless of device pixel ratio */
     canvas { display: block; width: 100vw !important; height: 100vh !important; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
@@ -188,9 +237,8 @@ function P5Preview({ code, width = 400, height = 400 }: { code: string; width?: 
 try { 
 ${code}
 } catch (e) {
-  document.body.innerHTML = '<pre style="color:red;font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \\'Liberation Mono\\', \\'Courier New\\', monospace; padding:8px;">' + (e && e.message ? e.message : 'Error') + '</pre>'
+  document.body.innerHTML = '<pre style="color:red;font:12px/1.4 monospace; padding:8px;">' + (e && e.message ? e.message : 'Error') + '</pre>'
 }
-// Move canvas into container when created
 function attachCanvasOnceReady() {
   var container = document.getElementById('container')
   if (!container) return
@@ -207,12 +255,54 @@ attachCanvasOnceReady()
 </script>
 </body>
 </html>`
+    } else if (framework === 'threejs') {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #000000; }
+    body { width: 100vw; height: 100vh; }
+    canvas { display: block; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<script>
+try {
+${code}
+} catch (e) {
+  document.body.innerHTML = '<pre style="color:red;font:12px/1.4 monospace; padding:8px; background:#fff;">' + (e && e.message ? e.message : 'Error') + '</pre>'
+}
+</script>
+</body>
+</html>`
+    } else if (framework === 'svg') {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #ffffff; }
+    body { width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+    svg { max-width: 100%; max-height: 100%; }
+  </style>
+</head>
+<body>
+${code}
+</body>
+</html>`
+    }
+    return ''
+  }
 
   return (
     <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
       <iframe
-        title="p5-preview"
-        srcDoc={html}
+        title={`${framework}-preview`}
+        srcDoc={getHTML()}
         width={width}
         height={height}
         className="block"

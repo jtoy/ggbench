@@ -26,6 +26,7 @@ export default function AdminPanel() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [selectedModel, setSelectedModel] = useState<number | ''>('')
   const [selectedPrompt, setSelectedPrompt] = useState<number | ''>('')
+  const [framework, setFramework] = useState<'threejs' | 'p5js' | 'svg'>('p5js')
   const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingForAll, setIsGeneratingForAll] = useState(false)
@@ -128,7 +129,7 @@ export default function AdminPanel() {
       })
       if (response.ok) {
         const data = await response.json()
-        setPrompts(Array.isArray(data) ? data : [])
+        setPrompts(Array.isArray(data.prompts) ? data.prompts : Array.isArray(data) ? data : [])
       } else {
         console.error('Failed to fetch prompts:', response.status)
         setPrompts([])
@@ -297,6 +298,8 @@ export default function AdminPanel() {
       return
     }
 
+    console.log('Generating animation with:', { modelId: selectedModel, promptId: selectedPrompt, framework })
+
     setIsGenerating(true)
     try {
       const response = await fetch('/api/admin/generate', {
@@ -305,22 +308,27 @@ export default function AdminPanel() {
         credentials: 'include',
         body: JSON.stringify({
           modelId: selectedModel,
-          promptId: selectedPrompt
+          promptId: selectedPrompt,
+          framework: framework
         })
       })
       
+      console.log('Response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('Generated animation successfully, code length:', data.code?.length)
         setGeneratedCode(data.code)
-        showToast('Animation generated successfully', 'success')
+        showToast(`Animation generated successfully for ${framework}!`, 'success')
       } else {
         const err = await response.json().catch(() => ({}))
         const msg = err?.error || 'Failed to generate animation'
+        console.error('Generation failed:', msg, err)
         showToast(msg, 'error')
       }
     } catch (error) {
       console.error('Error generating animation:', error)
-      showToast('Error generating animation', 'error')
+      showToast('Error generating animation: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -348,7 +356,8 @@ export default function AdminPanel() {
         credentials: 'include',
         body: JSON.stringify({
           modelId: selectedModel,
-          generateForAllPrompts: true
+          generateForAllPrompts: true,
+          framework: framework
         })
       })
       
@@ -387,7 +396,8 @@ export default function AdminPanel() {
         credentials: 'include',
         body: JSON.stringify({
           modelId: selectedModel,
-          overwriteAllPrompts: true
+          overwriteAllPrompts: true,
+          framework: framework
         })
       })
 
@@ -485,12 +495,6 @@ export default function AdminPanel() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             Manage Prompts
-          </Link>
-          <Link
-            href="/admin/model_gallery"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Model Gallery
           </Link>
         </div>
       </div>
@@ -760,6 +764,27 @@ export default function AdminPanel() {
                 Save Prompt Changes
               </button>
             </div>
+          </div>
+        </div>
+        
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">Framework Selection</h3>
+          <p className="text-sm text-blue-700 dark:text-blue-400 mb-3">
+            Select which framework to use for code generation. All frameworks work with all prompts - choose the one that best fits your needs.
+          </p>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-blue-900 dark:text-blue-300">
+              Framework:
+            </label>
+            <select
+              value={framework}
+              onChange={(e) => setFramework(e.target.value as 'threejs' | 'p5js' | 'svg')}
+              className="px-4 py-2 border border-blue-300 rounded-md bg-white dark:bg-gray-800 dark:border-blue-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              <option value="p5js">p5.js (Canvas 2D)</option>
+              <option value="threejs">Three.js (WebGL 3D)</option>
+              <option value="svg">SVG (Vector Graphics)</option>
+            </select>
           </div>
         </div>
         
