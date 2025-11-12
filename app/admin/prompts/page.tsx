@@ -27,6 +27,7 @@ export default function AdminPrompts() {
     status: 'active' as 'active' | 'inactive' | 'draft' | 'archived'
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
   // Check authorization first
   useEffect(() => {
@@ -138,6 +139,33 @@ export default function AdminPrompts() {
       showToast('Error updating prompt', 'error')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDelete = async (promptId: number, promptText: string) => {
+    if (!confirm(`Are you sure you want to delete the prompt "${promptText}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setIsDeleting(promptId)
+    try {
+      const res = await fetch(`/api/admin/prompts?id=${promptId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      })
+
+      if (res.ok) {
+        showToast('Prompt deleted successfully')
+        fetchPrompts() // Refresh the list
+      } else {
+        const error = await res.json().catch(() => ({}))
+        showToast(error.error || 'Failed to delete prompt', 'error')
+      }
+    } catch (error) {
+      console.error('Error deleting prompt:', error)
+      showToast('Error deleting prompt', 'error')
+    } finally {
+      setIsDeleting(null)
     }
   }
 
@@ -308,7 +336,11 @@ export default function AdminPrompts() {
                                 >
                                   <Edit className="h-4 w-4" />
                                 </button>
-                                <button className="text-gray-400 hover:text-red-600">
+                                <button 
+                                  onClick={() => handleDelete(prompt.id, prompt.text)}
+                                  disabled={isDeleting === prompt.id}
+                                  className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </div>

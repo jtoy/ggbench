@@ -146,3 +146,64 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request)
+    
+    if (!user || !user.is_admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Prompt id is required' },
+        { status: 400 }
+      )
+    }
+    
+    const client = await pool.connect()
+    try {
+      // Check if prompt exists and get animations count
+      const promptCheck = await client.query(
+        'SELECT COUNT(*) FROM animations WHERE prompt_id = $1',
+        [id]
+      )
+      
+      if (parseInt(promptCheck.rows[0].count) > 0) {
+        return NextResponse.json(
+          { error: 'Cannot delete prompt: it has associated animations' },
+          { status: 400 }
+        )
+      }
+      
+      const result = await client.query(
+        'DELETE FROM prompts WHERE id = $1 RETURNING id, text',
+        [id]
+      )
+      
+      if (result.rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Prompt not found' },
+          { status: 404 }
+        )
+      }
+      
+      return NextResponse.json({ success: true, deleted: result.rows[0] })
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error deleting prompt:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
