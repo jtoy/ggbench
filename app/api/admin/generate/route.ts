@@ -71,11 +71,14 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const { modelId, promptId, generateForAllPrompts, overwriteAllPrompts, framework = 'p5js' } = await request.json()
+    const { modelId, modelIds, promptId, generateForAllPrompts, overwriteAllPrompts, framework = 'p5js' } = await request.json()
     
-    if (!modelId) {
+    // Support both single modelId (backward compatibility) and multiple modelIds
+    const modelsToProcess = modelIds || (modelId ? [modelId] : [])
+    
+    if (modelsToProcess.length === 0) {
       return NextResponse.json(
-        { error: 'Model ID is required' },
+        { error: 'At least one Model ID is required' },
         { status: 400 }
       )
     }
@@ -96,23 +99,32 @@ export async function POST(request: NextRequest) {
     
     const client = await pool.connect()
     try {
-      // Get model and prompt details
-      const modelResult = await client.query(
-        'SELECT * FROM models WHERE id = $1 AND enabled = true',
-        [modelId]
+      // Get all models and validate they exist and are enabled
+      const modelsResult = await client.query(
+        'SELECT * FROM models WHERE id = ANY($1) AND enabled = true',
+        [modelsToProcess]
       )
       
-      if (modelResult.rows.length === 0) {
+      if (modelsResult.rows.length === 0) {
         return NextResponse.json(
-          { error: 'Model not found or disabled' },
+          { error: 'No enabled models found' },
           { status: 404 }
         )
       }
       
-      const model = modelResult.rows[0]
+      if (modelsResult.rows.length !== modelsToProcess.length) {
+        const foundIds = modelsResult.rows.map((m: any) => m.id)
+        const missingIds = modelsToProcess.filter((id: number) => !foundIds.includes(id))
+        return NextResponse.json(
+          { error: `Models not found or disabled: ${missingIds.join(', ')}` },
+          { status: 404 }
+        )
+      }
+      
+      const models = modelsResult.rows
       
       if (overwriteAllPrompts) {
-        // Generate for all prompts for this model and overwrite or insert animations
+        // Generate for all prompts for all selected models and overwrite or insert animations
         const allPrompts = await client.query(
           `SELECT p.id, p.text FROM prompts p ORDER BY p.id`
         )
@@ -128,80 +140,86 @@ export async function POST(request: NextRequest) {
         let successCount = 0
         let errorCount = 0
 
-        const batchSize = 5
+        const batchSize = 3 // Reduced batch size for multiple models
         const prompts = allPrompts.rows
 
         for (let i = 0; i < prompts.length; i += batchSize) {
           const batch = prompts.slice(i, i + batchSize)
           const batchPromises = batch.map(async (prompt) => {
-            try {
-              const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
-              // Upsert: update if exists else insert (checking framework too)
-              const existing = await client.query(
-                'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
-                [modelId, prompt.id, framework]
-              )
-              let animationId
-              if (existing.rows.length > 0) {
-                const update = await client.query(
-                  'UPDATE animations SET code = $1, created_at = NOW() WHERE id = $2 RETURNING id',
-                  [generatedCode, existing.rows[0].id]
+            const modelPromises = models.map(async (model) => {
+              try {
+                const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
+                // Upsert: update if exists else insert (checking framework too)
+                const existing = await client.query(
+                  'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
+                  [model.id, prompt.id, framework]
                 )
-                animationId = update.rows[0].id
-                console.log(`Overwrote animation ${animationId} for model ${modelId} prompt ${prompt.id} framework ${framework}`)
-              } else {
-                const insert = await client.query(
-                  'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
-                  [modelId, prompt.id, generatedCode, framework]
-                )
-                animationId = insert.rows[0].id
-                console.log(`Created animation ${animationId} for model ${modelId} prompt ${prompt.id} framework ${framework}`)
+                let animationId
+                if (existing.rows.length > 0) {
+                  const update = await client.query(
+                    'UPDATE animations SET code = $1, created_at = NOW() WHERE id = $2 RETURNING id',
+                    [generatedCode, existing.rows[0].id]
+                  )
+                  animationId = update.rows[0].id
+                  console.log(`Overwrote animation ${animationId} for model ${model.id} prompt ${prompt.id} framework ${framework}`)
+                } else {
+                  const insert = await client.query(
+                    'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+                    [model.id, prompt.id, generatedCode, framework]
+                  )
+                  animationId = insert.rows[0].id
+                  console.log(`Created animation ${animationId} for model ${model.id} prompt ${prompt.id} framework ${framework}`)
+                }
+                return { modelId: model.id, promptId: prompt.id, animationId, success: true }
+              } catch (error) {
+                console.error(`Error generating animation for model ${model.id} prompt ${prompt.id}:`, error)
+                return { modelId: model.id, promptId: prompt.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' }
               }
-              return { promptId: prompt.id, animationId, success: true }
-            } catch (error) {
-              console.error(`Error generating animation for prompt ${prompt.id}:`, error)
-              return { promptId: prompt.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-            }
+            })
+            return Promise.all(modelPromises)
           })
           const batchResults = await Promise.all(batchPromises)
-          for (const result of batchResults) {
-            results.push(result)
-            if (result.success) successCount++
-            else errorCount++
+          for (const modelResults of batchResults) {
+            for (const result of modelResults) {
+              results.push(result)
+              if (result.success) successCount++
+              else errorCount++
+            }
           }
         }
 
         return NextResponse.json({
-          message: `Generated ${successCount} animations (overwrite mode), ${errorCount} failed`,
+          message: `Generated ${successCount} animations (overwrite mode) for ${models.length} model(s), ${errorCount} failed`,
           generatedCount: successCount,
           errorCount,
           results
         })
       } else if (generateForAllPrompts) {
-        // Get all prompts that don't have animations for this model and framework
+        // Get all prompts that don't have animations for any of the selected models and framework
+        const placeholders = models.map((_, index) => `$${index + 2}`).join(',')
         const promptsToGenerate = await client.query(
           `SELECT p.id, p.text 
            FROM prompts p 
            WHERE NOT EXISTS (
              SELECT 1 FROM animations a 
-             WHERE a.model_id = $1 AND a.prompt_id = p.id AND a.framework = $2
+             WHERE a.model_id = ANY($1) AND a.prompt_id = p.id AND a.framework = $2
            )`,
-          [modelId, framework]
+          [modelsToProcess, framework]
         )
         
         if (promptsToGenerate.rows.length === 0) {
           return NextResponse.json({
-            message: 'All prompts already have animations for this model',
+            message: 'All prompts already have animations for the selected models',
             generatedCount: 0
           })
         }
         
-                const results = []
+        const results = []
         let successCount = 0
         let errorCount = 0
         
         // Process prompts in small batches to avoid rate limits
-        const batchSize = 5
+        const batchSize = 3 // Reduced batch size for multiple models
         const prompts = promptsToGenerate.rows
         
         for (let i = 0; i < prompts.length; i += batchSize) {
@@ -209,55 +227,62 @@ export async function POST(request: NextRequest) {
           
           // Process batch concurrently
           const batchPromises = batch.map(async (prompt) => {
-            try {
-              // Generate code using the LLM
-              const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
-              
-              // Insert new animation
-              const animationResult = await client.query(
-                'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
-                [modelId, prompt.id, generatedCode, framework]
-              )
-              
-              console.log(`Created animation for model ${modelId} and prompt ${prompt.id} framework ${framework}`)
-              
-              return {
-                promptId: prompt.id,
-                animationId: animationResult.rows[0].id,
-                success: true
+            const modelPromises = models.map(async (model) => {
+              try {
+                // Generate code using the LLM
+                const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
+                
+                // Insert new animation
+                const animationResult = await client.query(
+                  'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+                  [model.id, prompt.id, generatedCode, framework]
+                )
+                
+                console.log(`Created animation for model ${model.id} and prompt ${prompt.id} framework ${framework}`)
+                
+                return {
+                  modelId: model.id,
+                  promptId: prompt.id,
+                  animationId: animationResult.rows[0].id,
+                  success: true
+                }
+              } catch (error) {
+                console.error(`Error generating animation for model ${model.id} prompt ${prompt.id}:`, error)
+                return {
+                  modelId: model.id,
+                  promptId: prompt.id,
+                  success: false,
+                  error: error instanceof Error ? error.message : 'Unknown error'
+                }
               }
-            } catch (error) {
-              console.error(`Error generating animation for prompt ${prompt.id}:`, error)
-              return {
-                promptId: prompt.id,
-                success: false,
-                error: error instanceof Error ? error.message : 'Unknown error'
-              }
-            }
+            })
+            return Promise.all(modelPromises)
           })
           
           // Wait for batch to complete
           const batchResults = await Promise.all(batchPromises)
           
           // Count successes and failures
-          for (const result of batchResults) {
-            results.push(result)
-            if (result.success) {
-              successCount++
-            } else {
-              errorCount++
+          for (const modelResults of batchResults) {
+            for (const result of modelResults) {
+              results.push(result)
+              if (result.success) {
+                successCount++
+              } else {
+                errorCount++
+              }
             }
           }
         }
         
         return NextResponse.json({
-          message: `Generated ${successCount} animations, ${errorCount} failed`,
+          message: `Generated ${successCount} animations for ${models.length} model(s), ${errorCount} failed`,
           generatedCount: successCount,
           errorCount,
           results
         })
       } else {
-        // Single prompt generation
+        // Single prompt generation for multiple models
         const promptResult = await client.query(
           'SELECT * FROM prompts WHERE id = $1',
           [promptId]
@@ -272,45 +297,113 @@ export async function POST(request: NextRequest) {
         
         const prompt = promptResult.rows[0]
         
-        // Generate code using the LLM
-        let generatedCode: string
-        try {
-          generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
-        } catch (e) {
-          const message = e instanceof Error ? e.message : 'Failed to generate animation'
-          return NextResponse.json(
-            { error: message },
-            { status: 502 }
+        if (modelsToProcess.length === 1) {
+          // Single model - return code for backward compatibility
+          const model = models[0]
+          let generatedCode: string
+          try {
+            generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
+          } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to generate animation'
+            return NextResponse.json(
+              { error: message },
+              { status: 502 }
+            )
+          }
+          
+          // Check if animation already exists for this model_id, prompt_id, and framework combination
+          const existingAnimation = await client.query(
+            'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
+            [model.id, promptId, framework]
           )
-        }
-        
-        // Check if animation already exists for this model_id, prompt_id, and framework combination
-        const existingAnimation = await client.query(
-          'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
-          [modelId, promptId, framework]
-        )
 
-        let animationResult
-        if (existingAnimation.rows.length > 0) {
-          // Update existing animation
-          animationResult = await client.query(
-            'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 AND framework = $4 RETURNING id',
-            [generatedCode, modelId, promptId, framework]
-          )
-          console.log(`Updated existing animation for model ${modelId} and prompt ${promptId} framework ${framework}`)
+          let animationResult
+          if (existingAnimation.rows.length > 0) {
+            // Update existing animation
+            animationResult = await client.query(
+              'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 AND framework = $4 RETURNING id',
+              [generatedCode, model.id, promptId, framework]
+            )
+            console.log(`Updated existing animation for model ${model.id} and prompt ${promptId} framework ${framework}`)
+          } else {
+            // Insert new animation
+            animationResult = await client.query(
+              'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+              [model.id, promptId, generatedCode, framework]
+            )
+            console.log(`Created new animation for model ${model.id} and prompt ${promptId} framework ${framework}`)
+          }
+          
+          return NextResponse.json({
+            code: generatedCode,
+            animationId: animationResult.rows[0].id
+          })
         } else {
-          // Insert new animation
-          animationResult = await client.query(
-            'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
-            [modelId, promptId, generatedCode, framework]
-          )
-          console.log(`Created new animation for model ${modelId} and prompt ${promptId} framework ${framework}`)
+          // Multiple models - generate concurrently and return results
+          const results = []
+          let successCount = 0
+          let errorCount = 0
+          
+          const modelPromises = models.map(async (model) => {
+            try {
+              const generatedCode = await generateCodeWithLLM(model, prompt.text, framework as Framework)
+              
+              // Check if animation already exists
+              const existingAnimation = await client.query(
+                'SELECT id FROM animations WHERE model_id = $1 AND prompt_id = $2 AND framework = $3',
+                [model.id, promptId, framework]
+              )
+
+              let animationResult
+              if (existingAnimation.rows.length > 0) {
+                // Update existing animation
+                animationResult = await client.query(
+                  'UPDATE animations SET code = $1, created_at = NOW() WHERE model_id = $2 AND prompt_id = $3 AND framework = $4 RETURNING id',
+                  [generatedCode, model.id, promptId, framework]
+                )
+                console.log(`Updated existing animation for model ${model.id} and prompt ${promptId} framework ${framework}`)
+              } else {
+                // Insert new animation
+                animationResult = await client.query(
+                  'INSERT INTO animations (model_id, prompt_id, code, framework) VALUES ($1, $2, $3, $4) RETURNING id',
+                  [model.id, promptId, generatedCode, framework]
+                )
+                console.log(`Created new animation for model ${model.id} and prompt ${promptId} framework ${framework}`)
+              }
+              
+              return {
+                modelId: model.id,
+                animationId: animationResult.rows[0].id,
+                success: true
+              }
+            } catch (error) {
+              console.error(`Error generating animation for model ${model.id}:`, error)
+              return {
+                modelId: model.id,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            }
+          })
+          
+          const modelResults = await Promise.all(modelPromises)
+          
+          for (const result of modelResults) {
+            results.push(result)
+            if (result.success) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          }
+          
+          return NextResponse.json({
+            message: `Generated ${successCount} animations for ${models.length} model(s), ${errorCount} failed`,
+            generatedCount: successCount,
+            errorCount,
+            results
+          })
         }
-        
-        return NextResponse.json({
-          code: generatedCode,
-          animationId: animationResult.rows[0].id
-        })
       }
     } finally {
       client.release()

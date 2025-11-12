@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Play, Save, Trash2, Settings } from 'lucide-react'
+import { Plus, Play, Save, Trash2, Settings, CheckSquare, Square } from 'lucide-react'
 import Link from 'next/link'
 
 interface Model {
@@ -25,6 +25,8 @@ export default function AdminPanel() {
   const [models, setModels] = useState<Model[]>([])
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [selectedModel, setSelectedModel] = useState<number | ''>('')
+  const [selectedModels, setSelectedModels] = useState<number[]>([])
+  const [selectAllModels, setSelectAllModels] = useState(false)
   const [selectedPrompt, setSelectedPrompt] = useState<number | ''>('')
   const [framework, setFramework] = useState<'threejs' | 'p5js' | 'svg'>('p5js')
   const [generatedCode, setGeneratedCode] = useState('')
@@ -292,13 +294,44 @@ export default function AdminPanel() {
     ;(showToast as any)._tid = window.setTimeout(() => setToast(null), 4000)
   }
 
+  const handleModelSelection = (modelId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedModels(prev => [...prev, modelId])
+    } else {
+      setSelectedModels(prev => prev.filter(id => id !== modelId))
+      setSelectAllModels(false)
+    }
+  }
+
+  const handleSelectAllModels = (checked: boolean) => {
+    setSelectAllModels(checked)
+    if (checked) {
+      const enabledModelIds = models.filter(m => m.enabled).map(m => m.id)
+      setSelectedModels(enabledModelIds)
+    } else {
+      setSelectedModels([])
+    }
+  }
+
+  useEffect(() => {
+    const enabledModelIds = models.filter(m => m.enabled).map(m => m.id)
+    setSelectAllModels(enabledModelIds.length > 0 && selectedModels.length === enabledModelIds.length)
+  }, [selectedModels, models])
+
   const generateAnimation = async () => {
-    if (!selectedModel || !selectedPrompt) {
-      showToast('Please select both a model and a prompt', 'error')
+    const modelsToUse = selectedModels.length > 0 ? selectedModels : (selectedModel ? [selectedModel] : [])
+    
+    if (modelsToUse.length === 0) {
+      showToast('Please select at least one model', 'error')
+      return
+    }
+    
+    if (!selectedPrompt) {
+      showToast('Please select a prompt', 'error')
       return
     }
 
-    console.log('Generating animation with:', { modelId: selectedModel, promptId: selectedPrompt, framework })
+    console.log('Generating animation with:', { modelIds: modelsToUse, promptId: selectedPrompt, framework })
 
     setIsGenerating(true)
     try {
@@ -307,7 +340,7 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          modelId: selectedModel,
+          modelIds: modelsToUse,
           promptId: selectedPrompt,
           framework: framework
         })
@@ -317,9 +350,13 @@ export default function AdminPanel() {
       
       if (response.ok) {
         const data = await response.json()
-        console.log('Generated animation successfully, code length:', data.code?.length)
-        setGeneratedCode(data.code)
-        showToast(`Animation generated successfully for ${framework}!`, 'success')
+        console.log('Generated animation successfully')
+        if (data.code) {
+          setGeneratedCode(data.code)
+          showToast(`Animation generated successfully for ${framework}!`, 'success')
+        } else {
+          showToast(`Generated ${data.generatedCount || 0} animations successfully!`, 'success')
+        }
       } else {
         const err = await response.json().catch(() => ({}))
         const msg = err?.error || 'Failed to generate animation'
@@ -335,13 +372,15 @@ export default function AdminPanel() {
   }
 
   const generateForAllPrompts = async () => {
-    if (!selectedModel) {
-      alert('Please select a model')
+    const modelsToUse = selectedModels.length > 0 ? selectedModels : (selectedModel ? [selectedModel] : [])
+    
+    if (modelsToUse.length === 0) {
+      showToast('Please select at least one model', 'error')
       return
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to generate animations for ALL prompts that don't have animations for the selected model? This may take a while.`
+      `Are you sure you want to generate animations for ALL prompts that don't have animations for the selected model(s)? This may take a while.`
     )
     
     if (!confirmed) {
@@ -355,7 +394,7 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          modelId: selectedModel,
+          modelIds: modelsToUse,
           generateForAllPrompts: true,
           framework: framework
         })
@@ -378,13 +417,15 @@ export default function AdminPanel() {
   }
 
   const generateForAllPromptsOverwrite = async () => {
-    if (!selectedModel) {
-      alert('Please select a model')
+    const modelsToUse = selectedModels.length > 0 ? selectedModels : (selectedModel ? [selectedModel] : [])
+    
+    if (modelsToUse.length === 0) {
+      showToast('Please select at least one model', 'error')
       return
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to GENERATE for ALL prompts for this model and OVERWRITE existing animations? This may take a while and cannot be undone.`
+      `Are you sure you want to GENERATE for ALL prompts for the selected model(s) and OVERWRITE existing animations? This may take a while and cannot be undone.`
     )
     if (!confirmed) return
 
@@ -395,7 +436,7 @@ export default function AdminPanel() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          modelId: selectedModel,
+          modelIds: modelsToUse,
           overwriteAllPrompts: true,
           framework: framework
         })
@@ -617,21 +658,49 @@ export default function AdminPanel() {
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 dark:text-gray-300">
-              Select Model
+              Select Models (Multi-select)
             </label>
-                         <select
-               value={selectedModel}
-               onChange={(e) => setSelectedModel(e.target.value ? parseInt(e.target.value) : '')}
-               className="w-full px-3 py-2"
-             >
-               <option value="">Choose a model</option>
-               {Array.isArray(models) && models.map((model) => (
-                 <option key={model.id} value={model.id}>
-                   {model.name} ({model.api_type})
-                 </option>
-               ))}
-             </select>
-            {/* Auto-populated from DB on selection */}
+            <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-3">
+              <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                <input
+                  type="checkbox"
+                  id="select-all-models"
+                  checked={selectAllModels}
+                  onChange={(e) => handleSelectAllModels(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="select-all-models" className="text-sm font-medium text-gray-900 cursor-pointer flex items-center">
+                  {selectAllModels ? (
+                    <CheckSquare className="w-4 h-4 mr-1" />
+                  ) : (
+                    <Square className="w-4 h-4 mr-1" />
+                  )}
+                  Select All Enabled Models
+                </label>
+              </div>
+              {Array.isArray(models) && models.filter(model => model.enabled).map((model) => (
+                <div key={model.id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`model-${model.id}`}
+                    checked={selectedModels.includes(model.id)}
+                    onChange={(e) => handleModelSelection(model.id, e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor={`model-${model.id}`} className="text-sm text-gray-700 cursor-pointer">
+                    {model.name} ({model.api_type})
+                  </label>
+                </div>
+              ))}
+              {models.filter(model => model.enabled).length === 0 && (
+                <p className="text-sm text-gray-500 italic">No enabled models available</p>
+              )}
+            </div>
+            {selectedModels.length > 0 && (
+              <p className="text-xs text-gray-600 mt-1">
+                {selectedModels.length} model(s) selected
+              </p>
+            )}
           </div>
           
           <div>
@@ -791,16 +860,16 @@ export default function AdminPanel() {
         <div className="flex justify-start items-center gap-4 flex-wrap mt-4 sm:mt-6 mb-8">
           <button
             onClick={generateAnimation}
-            disabled={isGenerating || isGeneratingForAll || !selectedModel || !selectedPrompt}
+            disabled={isGenerating || isGeneratingForAll || (selectedModels.length === 0 && !selectedModel) || !selectedPrompt}
             className="btn-primary inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
-            {isGenerating ? 'Generating...' : 'Generate Animation'}
+            {isGenerating ? 'Generating...' : `Generate Animation${selectedModels.length > 1 ? 's' : ''}`}
           </button>
           
           <button
             onClick={generateForAllPrompts}
-            disabled={isGenerating || isGeneratingForAll || !selectedModel}
+            disabled={isGenerating || isGeneratingForAll || (selectedModels.length === 0 && !selectedModel)}
             className="btn-secondary inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
@@ -809,7 +878,7 @@ export default function AdminPanel() {
 
           <button
             onClick={generateForAllPromptsOverwrite}
-            disabled={isGenerating || isGeneratingForAll || isOverwritingAll || !selectedModel}
+            disabled={isGenerating || isGeneratingForAll || isOverwritingAll || (selectedModels.length === 0 && !selectedModel)}
             className="btn-danger inline-flex items-center h-11 px-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5 mr-2" />
